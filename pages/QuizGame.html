@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>가족 퀴즈 대결</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Jua&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary: #FF6B6B;
+            --secondary: #4ECDC4;
+            --accent: #FFE66D;
+            --dark: #2D3047;
+            --light: #F7FFF7;
+            --success: #95E1D3;
+        }
+        
+        body {
+            font-family: 'Gowun Batang', serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+            animation: drift 20s ease-in-out infinite;
+            pointer-events: none;
+        }
+        
+        @keyframes drift {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(50px, 50px) rotate(5deg); }
+        }
+        
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 50px;
+            position: relative;
+            animation: slideUp 0.6s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        h1 {
+            font-family: 'Jua', sans-serif;
+            font-size: 3em;
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 10px;
+            text-shadow: 3px 3px 0 var(--accent);
+            animation: bounce 1s ease-in-out infinite;
+        }
+        
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .subtitle {
+            font-family: 'Jua', sans-serif;
+            text-align: center;
+            color: var(--secondary);
+            font-size: 1.3em;
+            margin-bottom: 40px;
+        }
+        
+        .screen {
+            display: none;
+        }
+        
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .input-group {
+            margin-bottom: 30px;
+        }
+        
+        label {
+            display: block;
+            font-family: 'Jua', sans-serif;
+            font-size: 1.3em;
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 15px 20px;
+            border: 3px solid var(--secondary);
+            border-radius: 15px;
+            font-size: 1.1em;
+            font-family: 'Gowun Batang', serif;
+            transition: all 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            transform: scale(1.02);
+            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.3);
+        }
+        
+        .player-inputs {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .player-input-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .player-input-row input {
+            flex: 1;
+        }
+        
+        .remove-player {
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 15px 20px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .remove-player:hover {
+            transform: scale(0.95);
+            background: #ff5252;
+        }
+        
+        .btn {
+            font-family: 'Jua', sans-serif;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 18px 40px;
+            font-size: 1.4em;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 8px 15px rgba(255, 107, 107, 0.3);
+            display: inline-block;
+            margin: 10px 5px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 25px rgba(255, 107, 107, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background: var(--secondary);
+            box-shadow: 0 8px 15px rgba(78, 205, 196, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 12px 25px rgba(78, 205, 196, 0.4);
+        }
+        
+        .btn-add {
+            background: var(--accent);
+            color: var(--dark);
+            box-shadow: 0 8px 15px rgba(255, 230, 109, 0.3);
+            width: 100%;
+        }
+        
+        .btn-add:hover {
+            box-shadow: 0 12px 25px rgba(255, 230, 109, 0.4);
+        }
+        
+        .btn-group {
+            text-align: center;
+            margin-top: 30px;
+        }
+        
+        .loading {
+            text-align: center;
+            font-family: 'Jua', sans-serif;
+            font-size: 1.5em;
+            color: var(--primary);
+            margin: 30px 0;
+        }
+        
+        .spinner {
+            border: 5px solid var(--light);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .quiz-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .question-number {
+            font-family: 'Jua', sans-serif;
+            font-size: 1.5em;
+            color: var(--primary);
+            margin-bottom: 15px;
+        }
+        
+        .question-text {
+            font-size: 1.8em;
+            color: var(--dark);
+            margin-bottom: 25px;
+            line-height: 1.6;
+        }
+        
+        .answer-text {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 1.4em;
+            color: var(--secondary);
+            border-left: 5px solid var(--success);
+            font-weight: bold;
+        }
+        
+        .answer-label {
+            font-family: 'Jua', sans-serif;
+            font-size: 1.2em;
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+        
+        .player-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .player-btn {
+            font-family: 'Jua', sans-serif;
+            background: white;
+            border: 3px solid var(--secondary);
+            color: var(--dark);
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            min-width: 150px;
+        }
+        
+        .player-btn:hover {
+            transform: scale(1.05);
+            border-color: var(--primary);
+        }
+        
+        .player-btn.selected {
+            background: var(--success);
+            border-color: var(--success);
+            color: white;
+            transform: scale(1.05);
+        }
+        
+        .scoreboard {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, var(--light) 0%, white 100%);
+            border-radius: 10px;
+            font-size: 1.3em;
+            transition: all 0.3s;
+        }
+        
+        .score-item:hover {
+            transform: translateX(10px);
+        }
+        
+        .score-item.winner {
+            background: linear-gradient(90deg, var(--accent) 0%, #fff9c4 100%);
+            font-weight: bold;
+            font-size: 1.5em;
+            border: 3px solid var(--primary);
+        }
+        
+        .score-name {
+            font-family: 'Jua', sans-serif;
+        }
+        
+        .score-points {
+            font-family: 'Jua', sans-serif;
+            color: var(--primary);
+            font-size: 1.3em;
+        }
+        
+        .winner-announcement {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .winner-emoji {
+            font-size: 5em;
+            animation: rotate 2s ease-in-out infinite;
+        }
+        
+        @keyframes rotate {
+            0%, 100% { transform: rotate(-5deg); }
+            50% { transform: rotate(5deg); }
+        }
+        
+        .winner-text {
+            font-family: 'Jua', sans-serif;
+            font-size: 2.5em;
+            color: var(--primary);
+            margin-top: 20px;
+        }
+        
+        .progress-bar {
+            background: var(--light);
+            height: 20px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        .progress-fill {
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        
+        .progress-text {
+            font-family: 'Jua', sans-serif;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+            color: var(--dark);
+        }
+        
+        .error-message {
+            background: #ffebee;
+            border-left: 5px solid #f44336;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            color: #c62828;
+            font-size: 1.1em;
+        }
+        
+        #customCategories {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 20%);
+            border: 3px dashed var(--secondary);
+            font-family: 'Jua', sans-serif;
+        }
+        
+        #customCategories:focus {
+            background: white;
+            border-style: solid;
+        }
+        
+        #customCategories::placeholder {
+            color: #999;
+            font-family: 'Gowun Batang', serif;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 2em;
+            }
+            
+            .subtitle {
+                font-size: 1em;
+            }
+            
+            .player-btn {
+                min-width: 100px;
+                font-size: 1em;
+                padding: 12px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 설정 화면 -->
+        <div id="setupScreen" class="screen active">
+            <h1>🎯 가족 퀴즈 대결</h1>
+            <p class="subtitle">재미있는 퀴즈로 가족 대결을 시작하세요!</p>
+            
+            <div class="input-group">
+                <label>👥 참가자 이름 입력</label>
+                <div id="playerInputs" class="player-inputs">
+                    <div class="player-input-row">
+                        <input type="text" placeholder="참가자 1 이름" class="player-name">
+                    </div>
+                </div>
+                <button class="btn btn-add" onclick="addPlayer()">➕ 참가자 추가</button>
+            </div>
+            
+            <div class="input-group">
+                <label>🎨 카테고리 입력 (쉼표로 구분)</label>
+                <input type="text" id="customCategories" placeholder="예: 일반상식, 역사, 과학, 게임, K-POP, 자동차, 요리">
+                <p style="font-size: 0.95em; color: #666; margin-top: 10px;">💡 원하는 카테고리를 쉼표(,)로 구분해서 입력하세요. 여러 개 입력 가능합니다.</p>
+            </div>
+            
+            <div class="input-group">
+                <label>📊 난이도 선택</label>
+                <select id="difficulty">
+                    <option value="쉬움">쉬움 (11세 어린이도 풀 수 있는 수준)</option>
+                    <option value="보통" selected>보통 (청소년~성인 수준)</option>
+                    <option value="어려움">어려움 (성인 수준)</option>
+                </select>
+            </div>
+            
+            <div class="input-group">
+                <label>🎲 문제 수</label>
+                <select id="questionCount">
+                    <option value="5">5문제</option>
+                    <option value="10" selected>10문제</option>
+                    <option value="15">15문제</option>
+                    <option value="20">20문제</option>
+                </select>
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn" onclick="startQuiz()">🚀 퀴즈 시작!</button>
+            </div>
+        </div>
+        
+        <!-- 로딩 화면 -->
+        <div id="loadingScreen" class="screen">
+            <h1>🎯 가족 퀴즈 대결</h1>
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>AI가 재미있는 퀴즈를 만들고 있어요...</p>
+            </div>
+        </div>
+        
+        <!-- 퀴즈 진행 화면 -->
+        <div id="quizScreen" class="screen">
+            <h1>🎯 가족 퀴즈 대결</h1>
+            <div class="progress-text" id="progressText">문제 1 / 10</div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            
+            <div id="quizContent"></div>
+            
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="previousQuestion()">⬅️ 이전</button>
+                <button class="btn" onclick="nextQuestion()">다음 ➡️</button>
+            </div>
+        </div>
+        
+        <!-- 결과 화면 -->
+        <div id="resultScreen" class="screen">
+            <h1>🎯 가족 퀴즈 대결</h1>
+            <div class="winner-announcement">
+                <div class="winner-emoji">🏆</div>
+                <div class="winner-text" id="winnerText">우승자를 확인하세요!</div>
+            </div>
+            
+            <div class="scoreboard" id="scoreboard"></div>
+            
+            <div class="btn-group">
+                <button class="btn" onclick="resetQuiz()">🔄 새 게임 시작</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let players = [];
+        let currentQuestionIndex = 0;
+        let questions = [];
+        let scores = {};
+        let selectedWinners = {};
+        
+        function addPlayer() {
+            const playerInputs = document.getElementById('playerInputs');
+            const playerCount = playerInputs.children.length;
+            
+            if (playerCount >= 10) {
+                alert('최대 10명까지만 참가할 수 있습니다.');
+                return;
+            }
+            
+            const newRow = document.createElement('div');
+            newRow.className = 'player-input-row';
+            newRow.innerHTML = `
+                <input type="text" placeholder="참가자 ${playerCount + 1} 이름" class="player-name">
+                <button class="remove-player" onclick="removePlayer(this)">❌</button>
+            `;
+            playerInputs.appendChild(newRow);
+        }
+        
+        function removePlayer(button) {
+            const playerInputs = document.getElementById('playerInputs');
+            if (playerInputs.children.length > 1) {
+                button.parentElement.remove();
+            } else {
+                alert('최소 1명의 참가자가 필요합니다.');
+            }
+        }
+        
+        async function startQuiz() {
+            // 참가자 이름 수집
+            const playerInputs = document.querySelectorAll('.player-name');
+            players = Array.from(playerInputs)
+                .map(input => input.value.trim())
+                .filter(name => name !== '');
+            
+            if (players.length < 1) {
+                alert('최소 1명의 참가자 이름을 입력해주세요.');
+                return;
+            }
+            
+            // 중복 이름 체크
+            const uniquePlayers = new Set(players);
+            if (uniquePlayers.size !== players.length) {
+                alert('참가자 이름은 중복될 수 없습니다.');
+                return;
+            }
+            
+            // 카테고리 수집 (직접 입력만)
+            const customCategoriesInput = document.getElementById('customCategories').value.trim();
+            let selectedCategories = [];
+            
+            if (customCategoriesInput) {
+                selectedCategories = customCategoriesInput
+                    .split(',')
+                    .map(cat => cat.trim())
+                    .filter(cat => cat !== '');
+            }
+            
+            if (selectedCategories.length === 0) {
+                alert('최소 1개 이상의 카테고리를 입력해주세요.');
+                return;
+            }
+            
+            // 점수 초기화
+            scores = {};
+            players.forEach(player => scores[player] = 0);
+            
+            const difficulty = document.getElementById('difficulty').value;
+            const questionCount = parseInt(document.getElementById('questionCount').value);
+            
+            // 로딩 화면 표시
+            showScreen('loadingScreen');
+            
+            try {
+                // AI에게 퀴즈 생성 요청
+                const response = await fetch('https://api.anthropic.com/v1/messages', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        model: 'claude-sonnet-4-20250514',
+                        max_tokens: 1000,
+                        messages: [{
+                            role: 'user',
+                            content: `한국인을 위한 퀴즈를 ${questionCount}개 만들어주세요.
+
+난이도: ${difficulty}
+- 쉬움: 11세 어린이도 풀 수 있는 초등학생 수준의 일반상식, 간단한 수학, 동물/식물, 한국 문화 등
+- 보통: 중고등학생~성인 수준의 일반상식, 역사, 과학, 문화 등
+- 어려움: 성인 수준의 전문적인 지식, 복잡한 논리, 심화 상식 등
+
+선택된 카테고리 (${selectedCategories.length}개): ${selectedCategories.join(', ')}
+※ 문제는 위에 나열된 카테고리에서만 골고루 다양하게 출제해주세요. 각 카테고리에서 최소 1개씩은 나오도록 해주세요.
+
+요구사항:
+1. 모든 문제는 한국어로 작성
+2. 가족이 함께 즐길 수 있는 건전하고 재미있는 내용
+3. 정답이 명확한 객관식 또는 주관식 문제
+4. 선택된 카테고리에 적합한 문제 출제
+
+응답 형식은 반드시 JSON만 출력하고, 다른 텍스트는 포함하지 마세요:
+{
+  "questions": [
+    {
+      "question": "문제 내용",
+      "answer": "정답",
+      "category": "카테고리명"
+    }
+  ]
+}
+
+예시 (쉬움):
+{
+  "questions": [
+    {"question": "한국의 수도는 어디인가요?", "answer": "서울", "category": "지리"},
+    {"question": "1년은 몇 개월인가요?", "answer": "12개월", "category": "일반상식"}
+  ]
+}`
+                        }]
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.content || data.content.length === 0) {
+                    throw new Error('퀴즈 생성에 실패했습니다.');
+                }
+                
+                // AI 응답에서 JSON 추출
+                let jsonText = '';
+                for (const item of data.content) {
+                    if (item.type === 'text') {
+                        jsonText += item.text;
+                    }
+                }
+                
+                // JSON 파싱 (백틱 제거)
+                jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+                const quizData = JSON.parse(jsonText);
+                questions = quizData.questions;
+                
+                if (!questions || questions.length === 0) {
+                    throw new Error('퀴즈 문제가 생성되지 않았습니다.');
+                }
+                
+                currentQuestionIndex = 0;
+                selectedWinners = {};
+                
+                // 퀴즈 화면 표시
+                showScreen('quizScreen');
+                displayQuestion();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                showScreen('setupScreen');
+                alert('퀴즈 생성 중 오류가 발생했습니다. 다시 시도해주세요.\n오류: ' + error.message);
+            }
+        }
+        
+        function displayQuestion() {
+            const question = questions[currentQuestionIndex];
+            const quizContent = document.getElementById('quizContent');
+            
+            // 진행률 업데이트
+            const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('progressText').textContent = 
+                `문제 ${currentQuestionIndex + 1} / ${questions.length}`;
+            
+            // 카테고리 배지 생성
+            const categoryBadge = question.category ? 
+                `<div style="display: inline-block; background: var(--accent); color: var(--dark); padding: 5px 15px; border-radius: 20px; font-size: 0.9em; margin-bottom: 10px; font-family: 'Jua', sans-serif;">📌 ${question.category}</div>` : '';
+            
+            // 퀴즈 카드 생성
+            quizContent.innerHTML = `
+                <div class="quiz-card">
+                    ${categoryBadge}
+                    <div class="question-number">문제 ${currentQuestionIndex + 1}</div>
+                    <div class="question-text">${question.question}</div>
+                    <div class="answer-label">💡 정답:</div>
+                    <div class="answer-text">${question.answer}</div>
+                    
+                    <div style="margin-top: 30px;">
+                        <div class="answer-label">🏅 이 문제를 맞힌 사람을 선택하세요:</div>
+                        <div class="player-buttons" id="playerButtons"></div>
+                    </div>
+                </div>
+            `;
+            
+            // 플레이어 버튼 생성
+            const playerButtons = document.getElementById('playerButtons');
+            players.forEach(player => {
+                const button = document.createElement('button');
+                button.className = 'player-btn';
+                button.textContent = player;
+                button.onclick = () => togglePlayerSelection(player, button);
+                
+                // 이미 선택된 경우 표시
+                if (selectedWinners[currentQuestionIndex] && 
+                    selectedWinners[currentQuestionIndex].includes(player)) {
+                    button.classList.add('selected');
+                }
+                
+                playerButtons.appendChild(button);
+            });
+        }
+        
+        function togglePlayerSelection(player, button) {
+            if (!selectedWinners[currentQuestionIndex]) {
+                selectedWinners[currentQuestionIndex] = [];
+            }
+            
+            const index = selectedWinners[currentQuestionIndex].indexOf(player);
+            if (index > -1) {
+                // 이미 선택됨 - 선택 해제
+                selectedWinners[currentQuestionIndex].splice(index, 1);
+                button.classList.remove('selected');
+            } else {
+                // 새로 선택
+                selectedWinners[currentQuestionIndex].push(player);
+                button.classList.add('selected');
+            }
+        }
+        
+        function previousQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                displayQuestion();
+            }
+        }
+        
+        function nextQuestion() {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                displayQuestion();
+            } else {
+                // 마지막 문제 - 결과 화면으로
+                calculateScores();
+                showScreen('resultScreen');
+                displayResults();
+            }
+        }
+        
+        function calculateScores() {
+            // 점수 초기화
+            players.forEach(player => scores[player] = 0);
+            
+            // 각 문제별 승자에게 점수 부여
+            Object.values(selectedWinners).forEach(winners => {
+                winners.forEach(winner => {
+                    scores[winner]++;
+                });
+            });
+        }
+        
+        function displayResults() {
+            const scoreboard = document.getElementById('scoreboard');
+            
+            // 점수 순으로 정렬
+            const sortedPlayers = Object.entries(scores)
+                .sort((a, b) => b[1] - a[1]);
+            
+            // 우승자 발표
+            const winner = sortedPlayers[0];
+            const winnerText = document.getElementById('winnerText');
+            
+            if (sortedPlayers.length > 1 && sortedPlayers[0][1] === sortedPlayers[1][1]) {
+                // 동점
+                const winners = sortedPlayers
+                    .filter(p => p[1] === sortedPlayers[0][1])
+                    .map(p => p[0]);
+                winnerText.textContent = `공동 우승: ${winners.join(', ')}님!`;
+            } else {
+                winnerText.textContent = `우승: ${winner[0]}님! 🎉`;
+            }
+            
+            // 점수판 생성
+            scoreboard.innerHTML = sortedPlayers.map((player, index) => {
+                const isWinner = index === 0;
+                return `
+                    <div class="score-item ${isWinner ? 'winner' : ''}">
+                        <span class="score-name">${index + 1}. ${player[0]}</span>
+                        <span class="score-points">${player[1]}점</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+        
+        function resetQuiz() {
+            currentQuestionIndex = 0;
+            questions = [];
+            scores = {};
+            selectedWinners = {};
+            showScreen('setupScreen');
+        }
+    </script>
+</body>
+</html>
