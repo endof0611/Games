@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>어둠 속의 집 - 생존 공포 게임</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&family=Creepster&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{--blood:#8B0000;--blood-glow:#ff2222;--dark:#0a0a0a;--darker:#050505;--text:#c8c8c8;--text-dim:#666;--warning:#ff4444;--safe:#22aa44;--gold:#ffd700;}
+body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-serif;overflow:hidden;height:100vh;width:100vw;user-select:none;-webkit-user-select:none;}
+.vignette{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,0.85) 100%);pointer-events:none;z-index:1000;}
+.scanlines{position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px);pointer-events:none;z-index:1001;}
+.screen{position:fixed;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:400;}
+#title-screen{z-index:500;background:var(--darker);}
+#title-screen h1{font-family:'Creepster',cursive;font-size:clamp(2.5rem,8vw,5rem);color:var(--blood);text-shadow:0 0 20px rgba(139,0,0,0.6),0 0 60px rgba(139,0,0,0.3);letter-spacing:4px;animation:tp 3s ease-in-out infinite;text-align:center;padding:0 20px;}
+@keyframes tp{0%,100%{text-shadow:0 0 20px rgba(139,0,0,0.6),0 0 60px rgba(139,0,0,0.3);}50%{text-shadow:0 0 40px rgba(139,0,0,0.9),0 0 100px rgba(139,0,0,0.5);}}
+#title-screen .subtitle{color:var(--text-dim);font-size:clamp(0.8rem,2.5vw,1.1rem);margin-top:15px;letter-spacing:6px;text-transform:uppercase;font-weight:300;}
+.gbtn{padding:14px 44px;background:transparent;border:1px solid var(--blood);color:var(--blood);font-family:'Noto Sans KR',sans-serif;font-size:clamp(0.9rem,2.5vw,1.1rem);cursor:pointer;letter-spacing:3px;transition:all 0.3s;text-transform:uppercase;margin-top:30px;}
+.gbtn:hover{background:var(--blood);color:white;box-shadow:0 0 30px rgba(139,0,0,0.5);}
+.gbtn.secondary{border-color:var(--text-dim);color:var(--text);margin-top:25px;}
+.gbtn.secondary:hover{border-color:var(--text);background:rgba(255,255,255,0.05);box-shadow:none;}
+#title-screen .controls-hint{position:absolute;bottom:40px;color:var(--text-dim);font-size:clamp(0.6rem,1.8vw,0.75rem);text-align:center;line-height:1.8;padding:0 20px;}
+#intro-screen{z-index:499;background:var(--darker);}
+.news-overlay{background:rgba(10,10,10,0.95);border:1px solid #333;padding:clamp(20px,4vw,40px);max-width:600px;width:90%;position:relative;}
+.news-overlay .breaking{color:var(--warning);font-size:clamp(0.7rem,2vw,0.85rem);font-weight:700;letter-spacing:3px;margin-bottom:12px;animation:bf 1s infinite;}
+@keyframes bf{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.news-overlay .news-text{font-size:clamp(0.85rem,2.2vw,1.05rem);line-height:1.8;color:var(--text);}
+.news-overlay .news-text em{color:var(--warning);font-style:normal;font-weight:700;}
+#story-screen{z-index:498;background:var(--darker);}
+.story-box{max-width:550px;width:90%;text-align:center;}
+.story-emoji{font-size:clamp(3rem,10vw,5rem);margin-bottom:20px;}
+.story-text{font-size:clamp(0.85rem,2.2vw,1rem);line-height:2;color:var(--text);margin-bottom:30px;}
+.story-text em{color:var(--warning);font-style:normal;font-weight:700;}
+.story-choices{display:flex;flex-direction:column;gap:12px;align-items:center;}
+.story-choice{padding:12px 30px;background:rgba(255,255,255,0.03);border:1px solid #444;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:clamp(0.8rem,2vw,0.95rem);cursor:pointer;transition:all 0.2s;border-radius:4px;width:80%;max-width:350px;-webkit-tap-highlight-color:transparent;}
+.story-choice:hover{border-color:#888;background:rgba(255,255,255,0.06);}
+#action-screen{z-index:497;background:var(--darker);}
+.action-box{text-align:center;max-width:500px;width:90%;}
+.action-timer{font-family:'Creepster',cursive;font-size:clamp(2rem,6vw,3.5rem);color:var(--warning);margin-bottom:10px;}
+.action-count{font-size:clamp(1.2rem,3.5vw,1.8rem);font-weight:700;color:var(--text);margin-bottom:5px;}
+.action-label{font-size:clamp(0.5rem,1.3vw,0.65rem);color:var(--text-dim);letter-spacing:2px;margin-bottom:20px;text-transform:uppercase;}
+.action-bar-bg{width:100%;height:clamp(20px,4vw,30px);background:rgba(255,255,255,0.05);border:1px solid #333;border-radius:4px;overflow:hidden;margin-bottom:25px;}
+.action-bar{height:100%;background:linear-gradient(90deg,var(--blood),var(--warning));width:0%;transition:width 0.1s;border-radius:4px;}
+.action-bar.full{background:linear-gradient(90deg,var(--safe),#44cc66);}
+.tap-area{width:clamp(180px,45vw,250px);height:clamp(180px,45vw,250px);border-radius:50%;background:rgba(139,0,0,0.15);border:3px solid var(--blood);display:flex;align-items:center;justify-content:center;flex-direction:column;margin:0 auto;cursor:pointer;transition:all 0.1s;-webkit-tap-highlight-color:transparent;}
+.tap-area:active{transform:scale(0.95);background:rgba(139,0,0,0.3);}
+.tap-area .tap-text{font-size:clamp(0.8rem,2vw,1rem);color:var(--blood);font-weight:700;pointer-events:none;}
+.tap-area .tap-emoji{font-size:clamp(2.5rem,8vw,4rem);pointer-events:none;margin-bottom:8px;}
+.action-msg{font-size:clamp(0.7rem,1.8vw,0.85rem);color:var(--text-dim);margin-top:15px;}
+
+/* GAME (lock house) */
+#game-screen{z-index:400;flex-direction:column;}
+.hud{position:absolute;top:0;left:0;right:0;padding:clamp(8px,1.5vw,14px) clamp(15px,3vw,25px);display:flex;justify-content:space-between;align-items:center;z-index:450;background:linear-gradient(to bottom,rgba(0,0,0,0.92) 0%,transparent 100%);}
+.timer{font-family:'Creepster',cursive;font-size:clamp(1.6rem,4.5vw,2.8rem);color:var(--warning);text-shadow:0 0 15px rgba(255,68,68,0.5);line-height:1;}
+.timer.urgent{animation:tpu 0.5s infinite;color:var(--blood-glow);}
+@keyframes tpu{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+.timer-label{font-size:clamp(0.45rem,1.2vw,0.6rem);color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;margin-top:2px;}
+.ri-name{font-size:clamp(0.9rem,2.5vw,1.2rem);font-weight:700;color:var(--text);}
+.ri-sub{font-size:clamp(0.45rem,1.2vw,0.6rem);color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;}
+.stage-badge{position:absolute;top:clamp(8px,1.5vw,14px);left:50%;transform:translateX(-50%);font-size:clamp(0.5rem,1.2vw,0.65rem);color:var(--gold);letter-spacing:2px;z-index:451;text-transform:uppercase;}
+.room-scene{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:clamp(100px,18vh,160px);}
+.room-bg{position:absolute;top:0;left:0;right:0;bottom:0;transition:background 0.5s;}
+.room-bg.lit{background:linear-gradient(180deg,#1a1814 0%,#12100d 60%,#0a0908 100%);}
+.room-bg.dark{background:linear-gradient(180deg,#060606 0%,#030303 60%,#010101 100%);}
+.wall-line{position:absolute;bottom:38%;left:5%;right:5%;height:1px;background:rgba(255,255,255,0.04);}
+.scene-objects{position:relative;width:min(92vw,680px);height:min(55vh,420px);}
+.obj{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:default;transition:all 0.3s;}
+.obj .emoji{font-size:clamp(1.8rem,5vw,3.2rem);filter:brightness(0.6);transition:filter 0.3s,transform 0.2s;}
+.room-bg.dark .obj .emoji{filter:brightness(0.15);}
+.obj .obj-label{font-size:clamp(0.45rem,1.2vw,0.6rem);color:transparent;margin-top:4px;text-align:center;white-space:nowrap;}
+.obj.interactable{cursor:default;-webkit-tap-highlight-color:transparent;}
+.obj.interactable:active .emoji{transform:scale(0.95);}
+.status-popup{position:absolute;top:-8px;left:50%;transform:translateX(-50%) translateY(-100%);padding:5px 12px;border-radius:4px;font-size:clamp(0.6rem,1.5vw,0.75rem);white-space:nowrap;pointer-events:none;opacity:0;transition:all 0.3s;font-weight:700;letter-spacing:1px;z-index:20;}
+.status-popup.show{opacity:1;top:-14px;}
+.status-popup.st-unlocked{background:rgba(255,68,68,0.15);border:1px solid var(--warning);color:var(--warning);}
+.status-popup.st-locked{background:rgba(34,170,68,0.15);border:1px solid var(--safe);color:var(--safe);}
+.light-toggle{position:absolute;top:clamp(60px,10vh,80px);right:clamp(12px,2vw,20px);padding:8px 14px;background:rgba(255,255,255,0.03);border:1px solid #444;color:#aa8833;font-family:'Noto Sans KR',sans-serif;font-size:clamp(0.65rem,1.5vw,0.8rem);cursor:pointer;transition:all 0.2s;border-radius:4px;z-index:451;-webkit-tap-highlight-color:transparent;white-space:nowrap;}
+.minimap-area{position:absolute;bottom:0;left:0;right:0;z-index:450;background:linear-gradient(to top,rgba(0,0,0,0.95) 0%,rgba(0,0,0,0.85) 80%,transparent 100%);padding:clamp(8px,1.5vw,14px) clamp(10px,2vw,16px) clamp(10px,2vw,18px);}
+.minimap-label{font-size:clamp(0.4rem,1vw,0.5rem);color:var(--text-dim);letter-spacing:2px;text-transform:uppercase;text-align:center;margin-bottom:6px;}
+.minimap{position:relative;width:100%;max-width:400px;margin:0 auto;aspect-ratio:5/2.2;}
+.mm-room{position:absolute;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;font-size:clamp(0.4rem,1.1vw,0.55rem);color:var(--text-dim);letter-spacing:1px;cursor:pointer;transition:all 0.25s;-webkit-tap-highlight-color:transparent;background:rgba(15,15,15,0.9);}
+.mm-room:hover{border-color:#555;background:rgba(30,30,30,0.9);}
+.mm-room.active{border-color:var(--gold);background:rgba(255,215,0,0.08);color:var(--gold);box-shadow:0 0 10px rgba(255,215,0,0.15);}
+.mm-room.lit-r{background:rgba(30,25,15,0.7);}.mm-room.dark-r{background:rgba(5,5,5,0.9);}
+.mm-room.active.lit-r{background:rgba(50,45,20,0.6);}.mm-room.active.dark-r{background:rgba(20,18,5,0.5);}
+.hiding-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:460;}
+.hiding-overlay .ht{font-size:clamp(0.85rem,2.2vw,1.05rem);color:var(--gold);margin-bottom:20px;}
+.hiding-overlay .hb{padding:10px 24px;border:1px solid var(--gold);background:transparent;color:var(--gold);font-family:'Noto Sans KR',sans-serif;font-size:clamp(0.7rem,1.7vw,0.8rem);cursor:pointer;}
+.inv-overlay{position:absolute;top:0;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;z-index:470;pointer-events:none;}
+.inv-text{font-size:clamp(0.9rem,2.5vw,1.15rem);color:var(--warning);text-shadow:0 0 15px rgba(255,68,68,0.4);text-align:center;line-height:1.8;}
+
+/* MAZE */
+#maze-screen{z-index:401;flex-direction:column;background:var(--darker);}
+.maze-hud{position:absolute;top:0;left:0;right:0;padding:clamp(8px,1.5vw,14px) clamp(15px,3vw,25px);display:flex;justify-content:space-between;align-items:center;z-index:450;background:linear-gradient(to bottom,rgba(0,0,0,0.95) 0%,transparent 100%);}
+.maze-scene{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;}
+.maze-room-view{position:relative;width:min(92vw,680px);height:min(60vh,460px);}
+.maze-room-bg{position:absolute;top:0;left:0;right:0;bottom:0;background:linear-gradient(180deg,#080808 0%,#040404 60%,#020202 100%);}
+.maze-obj{position:absolute;display:flex;flex-direction:column;align-items:center;cursor:default;-webkit-tap-highlight-color:transparent;}
+.maze-obj .emoji{font-size:clamp(1.8rem,5vw,3.2rem);filter:brightness(0.25);transition:transform 0.15s;}
+.maze-obj .obj-label{font-size:clamp(0.45rem,1.2vw,0.6rem);color:transparent;margin-top:4px;}
+.maze-door{cursor:default;-webkit-tap-highlight-color:transparent;}
+.maze-door:active .emoji{transform:scale(0.9);}
+.maze-door .emoji{filter:brightness(0.4)!important;}
+.maze-door.exit-door .emoji{filter:brightness(0.4)!important;}
+.maze-wrong-flash{animation:mwf 0.5s forwards;}
+@keyframes mwf{0%{background:rgba(255,0,0,0.3);}100%{background:transparent;}}
+.maze-danger-edge{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:999;transition:box-shadow 1s;}
+.maze-minimap{position:absolute;bottom:clamp(10px,2vw,20px);left:50%;transform:translateX(-50%);z-index:450;background:rgba(0,0,0,0.85);border:1px solid #333;border-radius:6px;padding:clamp(8px,1.5vw,14px);}
+.maze-mm-grid{display:grid;grid-template-columns:repeat(4,clamp(22px,5vw,34px));grid-template-rows:repeat(3,clamp(22px,5vw,34px));gap:3px;}
+.maze-mm-cell{border:1px solid #222;display:flex;align-items:center;justify-content:center;font-size:clamp(6px,1.2vw,9px);color:var(--text-dim);background:rgba(10,10,10,0.9);border-radius:2px;position:relative;}
+.maze-mm-cell.mm-current{border-color:var(--gold);background:rgba(255,215,0,0.15);color:var(--gold);}
+.maze-mm-cell.mm-visited{background:rgba(30,30,30,0.6);}
+.maze-mm-cell.mm-killer{border-color:var(--blood-glow)!important;background:rgba(255,0,0,0.2)!important;animation:mmkp 1s infinite;}
+@keyframes mmkp{0%,100%{box-shadow:0 0 3px rgba(255,0,0,0.3);}50%{box-shadow:0 0 8px rgba(255,0,0,0.7);}}
+.maze-mm-cell.mm-exit{border-color:var(--safe);background:rgba(34,170,68,0.15);}
+.maze-msg{position:absolute;top:clamp(60px,10vh,80px);left:50%;transform:translateX(-50%);font-size:clamp(0.7rem,1.8vw,0.9rem);color:var(--warning);text-align:center;z-index:451;white-space:nowrap;opacity:0;transition:opacity 0.3s;}
+.maze-msg.show{opacity:1;}
+
+/* ROOFTOP STAGE 4 */
+#rooftop-screen{z-index:402;flex-direction:column;background:var(--darker);}
+.roof-hud{position:absolute;top:0;left:0;right:0;padding:clamp(8px,1.5vw,14px) clamp(15px,3vw,25px);display:flex;justify-content:space-between;align-items:center;z-index:450;background:linear-gradient(to bottom,rgba(0,0,0,0.95) 0%,transparent 100%);}
+.roof-scene{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;overflow:hidden;padding:clamp(60px,10vh,80px) 0 clamp(20px,3vh,30px);}
+.floor-indicator{font-family:'Creepster',cursive;font-size:clamp(1.5rem,4vw,2.5rem);color:var(--text-dim);margin-bottom:clamp(10px,2vh,20px);letter-spacing:3px;}
+.floor-indicator em{color:var(--gold);font-style:normal;}
+.stair-visual{position:relative;width:min(85vw,500px);height:clamp(50px,10vh,80px);margin-bottom:clamp(15px,2.5vh,25px);}
+.stair-step{position:absolute;height:100%;background:rgba(255,255,255,0.03);border:1px solid #222;border-radius:3px;transition:all 0.3s;}
+.stair-step.done{background:rgba(34,170,68,0.1);border-color:var(--safe);}
+.stair-step.current{background:rgba(255,215,0,0.08);border-color:var(--gold);box-shadow:0 0 10px rgba(255,215,0,0.1);}
+.stair-player{position:absolute;top:50%;font-size:clamp(1.2rem,3vw,1.8rem);transform:translate(-50%,-50%);transition:left 0.3s;z-index:5;}
+.obstacle-area{width:min(85vw,500px);height:clamp(120px,22vh,200px);position:relative;margin-bottom:clamp(15px,2.5vh,25px);}
+.obstacle-prompt{position:absolute;top:0;left:0;right:0;text-align:center;font-size:clamp(0.7rem,1.8vw,0.9rem);color:var(--warning);margin-bottom:10px;letter-spacing:1px;}
+.obstacle-choices{display:flex;gap:clamp(15px,4vw,30px);justify-content:center;position:absolute;top:40%;left:0;right:0;}
+.obstacle-btn{padding:clamp(14px,3vw,22px) clamp(30px,8vw,60px);background:rgba(255,255,255,0.03);border:2px solid #444;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:clamp(1.2rem,3vw,1.8rem);cursor:pointer;transition:all 0.15s;border-radius:8px;-webkit-tap-highlight-color:transparent;}
+.obstacle-btn:active{transform:scale(0.95);}
+.obstacle-btn.correct{border-color:var(--safe)!important;background:rgba(34,170,68,0.15)!important;color:var(--safe)!important;}
+.obstacle-btn.wrong{border-color:var(--blood-glow)!important;background:rgba(255,0,0,0.15)!important;color:var(--warning)!important;}
+.obstacle-item{position:absolute;font-size:clamp(2rem,6vw,3.5rem);transition:all 0.4s;pointer-events:none;}
+.roof-climb-area{width:min(85vw,500px);text-align:center;}
+.roof-climb-bar-bg{width:100%;height:clamp(16px,3vw,24px);background:rgba(255,255,255,0.05);border:1px solid #333;border-radius:4px;overflow:hidden;margin-bottom:10px;}
+.roof-climb-bar{height:100%;background:linear-gradient(90deg,var(--gold),#ffaa00);width:0%;transition:width 0.1s;border-radius:4px;}
+.roof-climb-bar.full{background:linear-gradient(90deg,var(--safe),#44cc66);}
+.roof-climb-label{font-size:clamp(0.5rem,1.3vw,0.65rem);color:var(--text-dim);letter-spacing:2px;}
+.roof-danger{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:999;transition:box-shadow 0.5s;}
+/* Keypad */
+.keypad-overlay{position:absolute;top:0;left:0;right:0;bottom:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,0.9);z-index:460;}
+.keypad-title{font-size:clamp(0.8rem,2vw,1rem);color:var(--warning);margin-bottom:15px;letter-spacing:2px;}
+.keypad-display{font-family:'Creepster',cursive;font-size:clamp(2rem,6vw,3rem);color:var(--gold);letter-spacing:15px;margin-bottom:20px;min-height:clamp(2.5rem,7vw,3.5rem);border-bottom:2px solid #333;padding:5px 20px;}
+.keypad-grid{display:grid;grid-template-columns:repeat(3,clamp(50px,14vw,75px));gap:8px;margin-bottom:15px;}
+.keypad-btn{padding:clamp(12px,3vw,18px);background:rgba(255,255,255,0.05);border:1px solid #444;color:var(--text);font-family:'Creepster',cursive;font-size:clamp(1.2rem,3.5vw,1.8rem);cursor:pointer;border-radius:6px;transition:all 0.15s;-webkit-tap-highlight-color:transparent;}
+.keypad-btn:active{background:rgba(255,255,255,0.1);transform:scale(0.95);}
+.keypad-hint{font-size:clamp(0.55rem,1.4vw,0.7rem);color:var(--text-dim);text-align:center;margin-top:8px;line-height:1.6;}
+
+/* RESULT */
+#result-screen{z-index:600;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#result-screen.lose{background:var(--darker);}#result-screen.win{background:linear-gradient(to bottom,#0a0f1a 0%,#1a2a3a 50%,#0a0f1a 100%);}
+.result-header{padding:clamp(25px,4vh,50px) 20px clamp(8px,1.5vh,16px);text-align:center;flex-shrink:0;}
+.result-header h2{font-family:'Creepster',cursive;font-size:clamp(2.2rem,7vw,4rem);}
+#result-screen.lose .result-header h2{color:var(--blood);text-shadow:0 0 30px rgba(139,0,0,0.8);}
+#result-screen.win .result-header h2{color:var(--gold);text-shadow:0 0 30px rgba(255,215,0,0.5);}
+.result-sub{margin-top:10px;font-size:clamp(0.8rem,2.2vw,1rem);color:var(--text-dim);}
+.result-stats{display:flex;gap:clamp(10px,2.5vw,20px);justify-content:center;flex-wrap:wrap;margin-top:12px;flex-shrink:0;}
+.stat-item{text-align:center;padding:8px 14px;border:1px solid #222;border-radius:4px;background:rgba(255,255,255,0.02);}
+.stat-value{font-size:clamp(1rem,2.5vw,1.3rem);font-weight:700;}.stat-label{font-size:clamp(0.45rem,1.1vw,0.55rem);color:var(--text-dim);letter-spacing:1px;margin-top:2px;}
+.result-map-container{width:min(90vw,520px);padding:15px 0;flex-shrink:0;}
+.result-map-title{font-size:clamp(0.55rem,1.3vw,0.7rem);color:var(--text-dim);letter-spacing:3px;text-transform:uppercase;text-align:center;margin-bottom:10px;}
+.result-map{position:relative;width:100%;aspect-ratio:4/3;border:1px solid #222;background:rgba(10,10,10,0.8);border-radius:4px;}
+.rmap-room{position:absolute;border:1px solid #2a2a2a;display:flex;align-items:center;justify-content:center;font-size:clamp(0.45rem,1.2vw,0.6rem);color:var(--text-dim);letter-spacing:1px;}
+.rmap-room.lit{background:rgba(40,35,20,0.4);}.rmap-room.dark-room{background:rgba(8,8,8,0.9);}
+.rmap-ep{position:absolute;width:clamp(18px,3vw,26px);height:clamp(18px,3vw,26px);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:clamp(7px,1.3vw,11px);transform:translate(-50%,-50%);}
+.rmap-ep.locked{background:rgba(34,170,68,0.2);border:2px solid var(--safe);}
+.rmap-ep.unlocked{background:rgba(255,50,50,0.2);border:2px solid var(--warning);animation:up 2s infinite;}
+@keyframes up{0%,100%{box-shadow:0 0 5px rgba(255,68,68,0.3);}50%{box-shadow:0 0 15px rgba(255,68,68,0.6);}}
+.rmap-ep.breached{border-color:var(--blood-glow);background:rgba(255,0,0,0.3);box-shadow:0 0 20px rgba(255,0,0,0.6);}
+.rmap-ep-label{position:absolute;top:110%;left:50%;transform:translateX(-50%);font-size:clamp(0.35rem,0.9vw,0.48rem);color:var(--text-dim);white-space:nowrap;}
+.audio-indicator{position:fixed;top:12px;right:12px;z-index:1100;font-size:clamp(1rem,2.5vw,1.3rem);cursor:pointer;opacity:0.4;transition:opacity 0.3s;-webkit-tap-highlight-color:transparent;}
+.audio-indicator:hover{opacity:1;}
+.blackout{position:fixed;top:0;left:0;right:0;bottom:0;background:black;z-index:550;display:none;}
+.jumpscare{position:fixed;top:0;left:0;right:0;bottom:0;z-index:560;display:none;align-items:center;justify-content:center;background:#000;overflow:hidden;}
+.horror-container{position:relative;width:100%;height:100%;}
+.horror-blood{position:absolute;top:50%;left:50%;width:0;height:0;border-radius:50%;background:radial-gradient(circle,rgba(120,0,0,0.95) 0%,rgba(80,0,0,0.7) 40%,rgba(50,0,0,0.4) 70%,transparent 100%);animation:hBS 2.5s ease-out forwards;transform:translate(-50%,-50%);}
+@keyframes hBS{0%{width:0;height:0;}30%{width:120vmax;height:120vmax;}100%{width:300vmax;height:300vmax;}}
+.horror-drip{position:absolute;top:0;left:0;right:0;height:100%;background:linear-gradient(180deg,rgba(100,0,0,0.9) 0%,rgba(70,0,0,0.5) 15%,transparent 40%);animation:hD 2s ease-in forwards;}
+@keyframes hD{0%{transform:translateY(-100%);}100%{transform:translateY(0%);}}
+.horror-splat{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(130,0,0,0.8) 0%,rgba(90,0,0,0.4) 60%,transparent 100%);animation:hSp 0.6s ease-out forwards;opacity:0;}
+.horror-splat:nth-child(1){top:20%;left:15%;width:25vw;height:25vw;animation-delay:0.3s;}.horror-splat:nth-child(2){top:60%;right:10%;width:30vw;height:30vw;animation-delay:0.6s;}.horror-splat:nth-child(3){bottom:15%;left:30%;width:20vw;height:20vw;animation-delay:0.9s;}.horror-splat:nth-child(4){top:35%;right:25%;width:18vw;height:18vw;animation-delay:1.2s;}.horror-splat:nth-child(5){bottom:30%;left:5%;width:22vw;height:22vw;animation-delay:0.5s;}
+@keyframes hSp{0%{transform:scale(0);opacity:0;}40%{opacity:0.9;}100%{transform:scale(1);opacity:0.7;}}
+.horror-streak{position:absolute;top:0;width:clamp(3px,0.8vw,8px);background:linear-gradient(180deg,rgba(110,0,0,0.9) 0%,rgba(80,0,0,0.5) 60%,transparent 100%);border-radius:0 0 4px 4px;animation:hSt 2.5s ease-in forwards;opacity:0;}
+.horror-streak:nth-child(1){left:12%;height:60vh;animation-delay:0.4s;}.horror-streak:nth-child(2){left:35%;height:80vh;animation-delay:0.7s;width:5px;}.horror-streak:nth-child(3){left:58%;height:45vh;animation-delay:1s;}.horror-streak:nth-child(4){left:78%;height:70vh;animation-delay:0.5s;width:6px;}.horror-streak:nth-child(5){left:90%;height:55vh;animation-delay:1.3s;}.horror-streak:nth-child(6){left:22%;height:90vh;animation-delay:0.8s;width:4px;}
+@keyframes hSt{0%{transform:translateY(-100%);opacity:0;}10%{opacity:0.8;}100%{transform:translateY(0%);opacity:0.6;}}
+.horror-static{position:absolute;top:0;left:0;right:0;bottom:0;opacity:0.08;background-size:100px 100px;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");animation:hSta 0.05s steps(3) infinite;mix-blend-mode:screen;}
+@keyframes hSta{0%{transform:translate(0,0);}33%{transform:translate(-10px,5px);}66%{transform:translate(8px,-3px);}100%{transform:translate(-5px,8px);}}
+.horror-edges{position:absolute;top:0;left:0;right:0;bottom:0;box-shadow:inset 0 0 80px rgba(139,0,0,0.6),inset 0 0 200px rgba(80,0,0,0.3);animation:hE 0.5s ease-in-out infinite alternate;}
+@keyframes hE{0%{box-shadow:inset 0 0 80px rgba(139,0,0,0.6),inset 0 0 200px rgba(80,0,0,0.3);}100%{box-shadow:inset 0 0 120px rgba(200,0,0,0.7),inset 0 0 250px rgba(100,0,0,0.4);}}
+.jumpscare-img{position:fixed;top:0;left:0;right:0;bottom:0;z-index:570;display:none;align-items:center;justify-content:center;background:#000;}
+.jumpscare-img img{width:100vw;height:100vh;object-fit:cover;animation:jsImg 0.08s steps(2) infinite;}
+@keyframes jsImg{0%{transform:translate(0,0) scale(1);}25%{transform:translate(-3px,2px) scale(1.02);}50%{transform:translate(4px,-3px) scale(0.99);}75%{transform:translate(-2px,-2px) scale(1.01);}100%{transform:translate(3px,3px) scale(1);}}
+.fade-in{animation:fi 1s forwards;}@keyframes fi{from{opacity:0;}to{opacity:1;}}
+.shake{animation:sk 0.08s infinite;}@keyframes sk{0%,100%{transform:translate(0,0);}25%{transform:translate(-4px,2px);}50%{transform:translate(3px,-3px);}75%{transform:translate(-2px,4px);}}
+</style>
+</head>
+<body>
+<div class="vignette"></div><div class="scanlines"></div>
+<div class="audio-indicator" id="audioToggle">🔇</div>
+<div class="screen" id="title-screen" style="display:flex"><h1>어둠 속의 집</h1><div class="subtitle">생존 공포 시뮬레이션</div><button class="gbtn" id="startBtn">시 작</button><div class="controls-hint">방 안의 문과 창문을 직접 클릭하여 잠그세요</div></div>
+<div class="screen" id="intro-screen"><div class="news-overlay"><div class="breaking">⚠ 긴급 속보 ⚠</div><div class="news-text" id="newsText"></div></div></div>
+<div class="screen" id="story-screen"><div class="story-box"><div class="story-emoji" id="storyEmoji">🏠</div><div class="story-text" id="storyText"></div><div class="story-choices" id="storyChoices"></div></div></div>
+<div class="screen" id="action-screen"><div class="action-box"><div class="action-timer" id="actionTimer">10</div><div class="action-count" id="actionCount">0 / 50</div><div class="action-label" id="actionLabel">클릭하여 도망쳐!</div><div class="action-bar-bg"><div class="action-bar" id="actionBar"></div></div><div class="tap-area" id="tapArea"><div class="tap-emoji" id="tapEmoji">🏃</div><div class="tap-text" id="tapText">연타!</div></div><div class="action-msg" id="actionMsg">미친 듯이 클릭하세요!</div></div></div>
+<div class="screen" id="game-screen" style="justify-content:stretch">
+  <div class="hud"><div><div class="timer" id="timerDisplay">0:30</div><div class="timer-label">침입까지 남은 시간</div></div><div style="text-align:right"><div class="ri-name" id="riName">현관</div><div class="ri-sub">현재 위치</div></div></div>
+  <div class="stage-badge" id="stageBadge">STAGE 1</div>
+  <button class="light-toggle" id="lightToggle" style="display:none">💡 불 끄기</button>
+  <div class="room-scene" id="roomScene"><div class="room-bg lit" id="roomBg"><div class="wall-line"></div></div><div class="scene-objects" id="sceneObjects"></div><div class="hiding-overlay" id="hidingOverlay"><div class="ht" id="hidingText">🤫 숨어 있는 중...</div><button class="hb" id="unhideBtn">나오기</button></div><div class="inv-overlay" id="invOverlay"><div class="inv-text" id="invText"></div></div></div>
+  <div class="minimap-area" id="minimapArea"><div class="minimap-label">─ 이동할 방을 선택하세요 ─</div><div class="minimap" id="minimap"></div></div>
+</div>
+
+<!-- MAZE SCREEN -->
+<div class="screen" id="maze-screen" style="justify-content:stretch">
+  <div class="maze-hud">
+    <div><div class="timer" id="mazeTimer">0:30</div><div class="timer-label">탈출까지 남은 시간</div></div>
+    <div style="text-align:right"><div class="ri-name" id="mazeRoomName">방 1</div><div class="ri-sub">현재 위치</div></div>
+  </div>
+  <div class="stage-badge">STAGE 3</div>
+  <div class="maze-msg" id="mazeMsg"></div>
+  <div class="maze-scene">
+    <div class="maze-room-view" id="mazeRoomView">
+      <div class="maze-room-bg"></div>
+      <div id="mazeObjects"></div>
+    </div>
+  </div>
+  <div class="maze-minimap"><div class="maze-mm-grid" id="mazeMinimap"></div></div>
+  <div class="maze-danger-edge" id="mazeDanger"></div>
+</div>
+
+<!-- ROOFTOP SCREEN -->
+<div class="screen" id="rooftop-screen" style="justify-content:stretch">
+  <div class="roof-hud">
+    <div><div class="timer" id="roofTimer">1:00</div><div class="timer-label">헬기 도착까지</div></div>
+    <div style="text-align:right"><div class="ri-name" id="roofFloorName">1층</div><div class="ri-sub">현재 층</div></div>
+  </div>
+  <div class="stage-badge">STAGE 4</div>
+  <div class="roof-scene" id="roofScene">
+    <div class="floor-indicator" id="floorIndicator"><em>1F</em> / 5F</div>
+    <div class="stair-visual" id="stairVisual"></div>
+    <div class="obstacle-area" id="obstacleArea"></div>
+    <div class="roof-climb-area" id="roofClimbArea" style="display:none">
+      <div class="roof-climb-bar-bg"><div class="roof-climb-bar" id="roofClimbBar"></div></div>
+      <div class="roof-climb-label" id="roofClimbLabel">연타하여 계단을 올라가세요!</div>
+    </div>
+    <div class="keypad-overlay" id="keypadOverlay">
+      <div class="keypad-title">🔒 옥상문 비밀번호</div>
+      <div class="keypad-display" id="keypadDisplay">____</div>
+      <div class="keypad-grid" id="keypadGrid"></div>
+      <div class="keypad-hint" id="keypadHint"></div>
+    </div>
+  </div>
+  <div class="roof-danger" id="roofDanger"></div>
+</div>
+
+<div class="blackout" id="blackout"></div>
+<div class="jumpscare-img" id="jumpscareImg"><img src="https://images.pexels.com/photos/29397077/pexels-photo-29397077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt=""></div>
+<div class="jumpscare" id="jumpscare"><div class="horror-container"><div class="horror-blood"></div><div class="horror-drip"></div><div class="horror-splat"></div><div class="horror-splat"></div><div class="horror-splat"></div><div class="horror-splat"></div><div class="horror-splat"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-static"></div><div class="horror-edges"></div></div></div>
+<div class="screen" id="result-screen"><div class="result-header"><h2 id="resultTitle"></h2><div class="result-sub" id="resultSub"></div></div><div class="result-stats" id="resultStats"></div><div class="result-map-container" id="resultMapContainer"><div class="result-map-title">─── 집 전체 현황 ───</div><div class="result-map" id="resultMap"></div></div><button class="gbtn secondary" id="retryBtn">다시 도전</button><button class="gbtn" id="nextStageBtn" style="display:none">다음 스테이지 →</button><div style="height:40px"></div></div>
+
+<script>
+// AUDIO
+class Au{
+  constructor(){this.c=null;this.on=false;this.g=null;}
+  init(){if(this.c)return;this.c=new(window.AudioContext||window.webkitAudioContext)();this.g=this.c.createGain();this.g.gain.value=0.5;this.g.connect(this.c.destination);this.on=true;document.getElementById('audioToggle').textContent='🔊';}
+  toggle(){if(!this.c){this.init();return;}this.on=!this.on;this.g.gain.value=this.on?0.5:0;document.getElementById('audioToggle').textContent=this.on?'🔊':'🔇';}
+  t(f,d,ty='sine',v=0.3){if(!this.c||!this.on)return;const o=this.c.createOscillator(),g=this.c.createGain();o.type=ty;o.frequency.value=f;g.gain.setValueAtTime(v,this.c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,this.c.currentTime+d);o.connect(g);g.connect(this.g);o.start();o.stop(this.c.currentTime+d);}
+  lock(){this.t(800,0.1,'square',0.15);setTimeout(()=>this.t(1200,0.15,'square',0.12),80);}
+  lightOff(){this.t(200,0.15,'sine',0.1);}lightOn(){this.t(600,0.1,'sine',0.1);}
+  move(){this.t(250,0.06,'triangle',0.1);setTimeout(()=>this.t(300,0.06,'triangle',0.08),80);}
+  hide(){this.t(150,0.2,'sine',0.1);}
+  foot(){this.t(60+Math.random()*30,0.3,'sine',0.25);setTimeout(()=>this.t(50+Math.random()*20,0.2,'triangle',0.15),100);}
+  rattle(){for(let i=0;i<5;i++)setTimeout(()=>this.t(100+Math.random()*150,0.08,'sawtooth',0.2),i*60);}
+  brk(){this.t(60,0.5,'sawtooth',0.4);this.t(40,0.8,'square',0.3);}
+  scream(){this.t(55,2.5,'sawtooth',0.35);this.t(58,2.5,'sawtooth',0.3);this.t(110,2,'sine',0.2);setTimeout(()=>{this.t(1800,1.5,'square',0.08);this.t(1850,1.5,'square',0.06);},300);setTimeout(()=>{this.t(30,2,'triangle',0.3);},100);}
+  win(){[523,659,784,1047].forEach((n,i)=>setTimeout(()=>this.t(n,0.4,'sine',0.15),i*200));}
+  hb(){if(!this.c||!this.on)return;this.t(50,0.15,'sine',0.3);setTimeout(()=>this.t(45,0.15,'sine',0.25),150);}
+  tap(){this.t(400+Math.random()*200,0.04,'square',0.08);}
+  knock(){this.t(150,0.12,'square',0.2);this.t(100,0.15,'triangle',0.15);}
+  danger(){this.t(80,0.3,'sawtooth',0.2);this.t(85,0.3,'sawtooth',0.18);}
+  doorOpen(){this.t(180,0.2,'triangle',0.15);setTimeout(()=>this.t(120,0.3,'sine',0.1),100);}
+  wrong(){this.t(200,0.3,'square',0.2);this.t(150,0.3,'sawtooth',0.15);}
+  amb(){if(!this.c||!this.on)return;const o=this.c.createOscillator(),g=this.c.createGain();o.type='sawtooth';o.frequency.value=40;g.gain.value=0.04;o.connect(g);g.connect(this.g);o.start();this._a=o;}
+  stopAmb(){if(this._a){this._a.stop();this._a=null;}}
+}
+const au=new Au();
+
+// HOUSE DATA
+const HOUSE1={rooms:{
+  hallway:{label:'현관',hasLight:true,objects:[{emoji:'👟',x:15,y:72,label:'신발장'},{emoji:'☂️',x:75,y:65,label:'우산꽂이'},{emoji:'🧥',x:85,y:35,label:'코트걸이'},{emoji:'🪞',x:50,y:30,label:'거울'}],entries:[{id:'front_door',emoji:'🚪',x:50,y:55,label:'현관문'}]},
+  livingroom:{label:'거실',hasLight:true,objects:[{emoji:'🛋️',x:25,y:62,label:'소파'},{emoji:'📺',x:50,y:28,label:'TV'},{emoji:'🪑',x:72,y:65,label:'탁자'},{emoji:'🪴',x:10,y:38,label:'화분'},{emoji:'🪔',x:88,y:38,label:'스탠드'}],entries:[{id:'living_window',emoji:'🪟',x:50,y:12,label:'거실 창문'}]},
+  kitchen:{label:'부엌',hasLight:true,objects:[{emoji:'🧊',x:15,y:40,label:'냉장고'},{emoji:'🍳',x:45,y:58,label:'가스레인지'},{emoji:'🚰',x:70,y:48,label:'싱크대'},{emoji:'🔪',x:88,y:60,label:'칼꽂이'}],entries:[{id:'kitchen_window',emoji:'🪟',x:30,y:12,label:'부엌 창문'},{id:'back_door',emoji:'🚪',x:75,y:12,label:'뒷문'}]},
+  bedroom1:{label:'침실1',hasLight:true,objects:[{emoji:'🛏️',x:30,y:58,label:'침대',canHide:true,hideLabel:'침대 밑'},{emoji:'🚪',x:82,y:42,label:'옷장',canHide:true,hideLabel:'옷장 안'},{emoji:'🪑',x:15,y:38,label:'책상'},{emoji:'🕰️',x:55,y:25,label:'시계'}],entries:[{id:'bedroom1_window',emoji:'🪟',x:50,y:12,label:'침실1 창문'}]},
+  bedroom2:{label:'침실2',hasLight:true,objects:[{emoji:'🛏️',x:35,y:60,label:'침대',canHide:true,hideLabel:'침대 밑'},{emoji:'🧸',x:80,y:55,label:'인형'},{emoji:'📚',x:15,y:35,label:'책장'},{emoji:'🖼️',x:55,y:22,label:'액자'}],entries:[{id:'bedroom2_window',emoji:'🪟',x:50,y:12,label:'침실2 창문'}]},
+  bedroom3:{label:'침실3',hasLight:true,objects:[{emoji:'🛏️',x:30,y:55,label:'침대',canHide:true,hideLabel:'침대 밑'},{emoji:'🎸',x:82,y:48,label:'기타'},{emoji:'🖥️',x:15,y:40,label:'컴퓨터'},{emoji:'🪴',x:60,y:25,label:'화분'}],entries:[{id:'bedroom3_window',emoji:'🪟',x:50,y:12,label:'침실3 창문'}]},
+  bathroom:{label:'화장실',hasLight:true,objects:[{emoji:'🚽',x:30,y:58,label:'변기'},{emoji:'🛁',x:65,y:55,label:'욕조'},{emoji:'🧻',x:85,y:35,label:'수건'}],entries:[]},
+  storage:{label:'창고',hasLight:false,objects:[{emoji:'📦',x:20,y:55,label:'상자'},{emoji:'📦',x:42,y:68,label:'상자'},{emoji:'🧰',x:75,y:48,label:'공구함'},{emoji:'🧹',x:60,y:32,label:'빗자루'}],entries:[{id:'storage_window',emoji:'🪟',x:50,y:12,label:'창고 창문'}]},
+},mmRooms:[{id:'hallway',x:82,y:5,w:16,h:90,label:'현관'},{id:'livingroom',x:2,y:5,w:32,h:45,label:'거실'},{id:'kitchen',x:34,y:5,w:24,h:45,label:'부엌'},{id:'bathroom',x:58,y:5,w:12,h:45,label:'화장실'},{id:'storage',x:70,y:5,w:12,h:45,label:'창고'},{id:'bedroom1',x:2,y:50,w:26,h:45,label:'침실1'},{id:'bedroom2',x:28,y:50,w:26,h:45,label:'침실2'},{id:'bedroom3',x:54,y:50,w:28,h:45,label:'침실3'}],
+rmRooms:[{id:'livingroom',x:5,y:5,w:35,h:40},{id:'kitchen',x:40,y:5,w:22,h:40},{id:'bathroom',x:62,y:5,w:13,h:40},{id:'storage',x:62,y:45,w:13,h:50},{id:'hallway',x:75,y:5,w:20,h:90},{id:'bedroom1',x:5,y:45,w:19,h:50},{id:'bedroom2',x:24,y:45,w:19,h:50},{id:'bedroom3',x:43,y:45,w:19,h:50}],
+rmEps:[{id:'front_door',x:94,y:50,label:'현관문'},{id:'living_window',x:22,y:3,label:'거실 창문'},{id:'kitchen_window',x:48,y:3,label:'부엌 창문'},{id:'back_door',x:56,y:3,label:'뒷문'},{id:'bedroom1_window',x:3,y:70,label:'침실1 창문'},{id:'bedroom2_window',x:33,y:97,label:'침실2 창문'},{id:'bedroom3_window',x:52,y:97,label:'침실3 창문'},{id:'storage_window',x:73,y:70,label:'창고 창문'}]};
+
+const HOUSE2={rooms:{
+  hallway:{label:'현관',hasLight:true,objects:[{emoji:'🧲',x:20,y:70,label:'자석 메모판'},{emoji:'🎒',x:78,y:62,label:'가방'},{emoji:'🧤',x:50,y:28,label:'장갑'}],entries:[{id:'n_front_door',emoji:'🚪',x:50,y:55,label:'현관문'}]},
+  livingroom:{label:'거실',hasLight:true,objects:[{emoji:'🛋️',x:70,y:60,label:'소파'},{emoji:'📻',x:25,y:30,label:'라디오'},{emoji:'🕯️',x:50,y:65,label:'촛대'},{emoji:'🖼️',x:85,y:28,label:'그림'},{emoji:'📰',x:15,y:58,label:'신문'}],entries:[{id:'n_living_window1',emoji:'🪟',x:30,y:12,label:'거실 창문1'},{id:'n_living_window2',emoji:'🪟',x:70,y:12,label:'거실 창문2'}]},
+  kitchen:{label:'부엌',hasLight:true,objects:[{emoji:'🧊',x:80,y:42,label:'냉장고'},{emoji:'🫖',x:40,y:55,label:'주전자'},{emoji:'🍽️',x:20,y:48,label:'식기'},{emoji:'🧂',x:60,y:62,label:'양념통'}],entries:[{id:'n_kitchen_window',emoji:'🪟',x:50,y:12,label:'부엌 창문'}]},
+  bedroom1:{label:'침실1',hasLight:true,objects:[{emoji:'🛏️',x:65,y:55,label:'침대',canHide:true,hideLabel:'침대 밑'},{emoji:'🧳',x:18,y:45,label:'여행가방',canHide:true,hideLabel:'가방 뒤'},{emoji:'💡',x:85,y:30,label:'조명'},{emoji:'📖',x:40,y:25,label:'책'}],entries:[{id:'n_bed1_window',emoji:'🪟',x:50,y:12,label:'침실1 창문'}]},
+  bedroom2:{label:'침실2',hasLight:true,objects:[{emoji:'🛏️',x:30,y:58,label:'침대',canHide:true,hideLabel:'침대 밑'},{emoji:'🎮',x:78,y:42,label:'게임기'},{emoji:'🏆',x:50,y:22,label:'트로피'},{emoji:'🧦',x:15,y:65,label:'서랍'}],entries:[{id:'n_bed2_window',emoji:'🪟',x:50,y:12,label:'침실2 창문'}]},
+  bedroom3:{label:'침실3',hasLight:true,objects:[{emoji:'🛏️',x:55,y:52,label:'침대',canHide:true,hideLabel:'침대 밑'},{emoji:'🪆',x:20,y:38,label:'인형'},{emoji:'🎨',x:82,y:30,label:'이젤'},{emoji:'🧶',x:40,y:68,label:'뜨개질'}],entries:[{id:'n_bed3_window',emoji:'🪟',x:50,y:12,label:'침실3 창문'}]},
+  bathroom:{label:'화장실',hasLight:true,objects:[{emoji:'🚿',x:35,y:55,label:'샤워기'},{emoji:'🪥',x:70,y:45,label:'칫솔'},{emoji:'🧴',x:85,y:60,label:'로션'}],entries:[]},
+  storage:{label:'다용도실',hasLight:false,objects:[{emoji:'🧺',x:25,y:55,label:'빨래바구니'},{emoji:'👕',x:55,y:40,label:'빨래'},{emoji:'🪣',x:78,y:60,label:'양동이'},{emoji:'🔧',x:40,y:68,label:'공구'}],entries:[{id:'n_storage_window',emoji:'🪟',x:50,y:12,label:'다용도실 창문'}]},
+},mmRooms:[{id:'hallway',x:2,y:5,w:16,h:90,label:'현관'},{id:'livingroom',x:18,y:5,w:36,h:45,label:'거실'},{id:'kitchen',x:54,y:5,w:22,h:45,label:'부엌'},{id:'bathroom',x:76,y:5,w:22,h:45,label:'화장실'},{id:'bedroom1',x:18,y:50,w:22,h:45,label:'침실1'},{id:'bedroom2',x:40,y:50,w:22,h:45,label:'침실2'},{id:'bedroom3',x:62,y:50,w:18,h:45,label:'침실3'},{id:'storage',x:80,y:50,w:18,h:45,label:'다용도실'}],
+rmRooms:[{id:'hallway',x:5,y:5,w:15,h:90},{id:'livingroom',x:20,y:5,w:35,h:42},{id:'kitchen',x:55,y:5,w:20,h:42},{id:'bathroom',x:75,y:5,w:20,h:42},{id:'bedroom1',x:20,y:47,w:20,h:48},{id:'bedroom2',x:40,y:47,w:20,h:48},{id:'bedroom3',x:60,y:47,w:17,h:48},{id:'storage',x:77,y:47,w:18,h:48}],
+rmEps:[{id:'n_front_door',x:3,y:50,label:'현관문'},{id:'n_living_window1',x:30,y:3,label:'거실 창문1'},{id:'n_living_window2',x:45,y:3,label:'거실 창문2'},{id:'n_kitchen_window',x:65,y:3,label:'부엌 창문'},{id:'n_bed1_window',x:30,y:97,label:'침실1 창문'},{id:'n_bed2_window',x:50,y:97,label:'침실2 창문'},{id:'n_bed3_window',x:68,y:97,label:'침실3 창문'},{id:'n_storage_window',x:86,y:97,label:'다용도실 창문'}]};
+
+// ===== MAZE DATA (12 rooms, 4x3 grid) =====
+const MAZE_DECOR=[
+  [{emoji:'🪣',x:20,y:55},{emoji:'🕸️',x:75,y:30},{emoji:'💀',x:50,y:65}],
+  [{emoji:'🛢️',x:25,y:60},{emoji:'🔩',x:70,y:40},{emoji:'🪤',x:50,y:28}],
+  [{emoji:'🧱',x:30,y:50},{emoji:'🕯️',x:80,y:35},{emoji:'🪜',x:15,y:65}],
+  [{emoji:'📦',x:65,y:55},{emoji:'🕸️',x:20,y:28},{emoji:'⛓️',x:85,y:62}],
+  [{emoji:'🛢️',x:40,y:60},{emoji:'🪝',x:75,y:30},{emoji:'🧹',x:15,y:45}],
+  [{emoji:'💀',x:80,y:55},{emoji:'🧱',x:25,y:35},{emoji:'🪣',x:55,y:68}],
+  [{emoji:'⛓️',x:30,y:42},{emoji:'🕯️',x:70,y:60},{emoji:'🔩',x:50,y:25}],
+  [{emoji:'🪜',x:20,y:58},{emoji:'📦',x:80,y:40},{emoji:'🕸️',x:45,y:30}],
+  [{emoji:'🧱',x:60,y:55},{emoji:'🪤',x:15,y:35},{emoji:'🛢️',x:85,y:50}],
+  [{emoji:'🕸️',x:35,y:62},{emoji:'💀',x:75,y:28},{emoji:'⛓️',x:20,y:40}],
+  [{emoji:'🪝',x:50,y:55},{emoji:'📦',x:15,y:30},{emoji:'🕯️',x:85,y:45}],
+  [{emoji:'🔩',x:40,y:50},{emoji:'🧱',x:80,y:65},{emoji:'🪣',x:25,y:28}],
+];
+
+// STATE
+let S={},currentStage=1,currentHouse=HOUSE1,allEntries=[];
+function buildEntries(h){const e=[];Object.values(h.rooms).forEach(r=>r.entries.forEach(ep=>e.push(ep)));return e;}
+function initState(dur,house){currentHouse=house;allEntries=buildEntries(house);S={phase:'title',room:'hallway',timeLeft:dur,locks:{},lights:{},hiding:false,hideSpot:null,timer:null,locked:0,total:allEntries.length,breached:null,popups:{}};allEntries.forEach(e=>S.locks[e.id]=false);Object.keys(house.rooms).forEach(r=>S.lights[r]=house.rooms[r].hasLight);}
+function hideAll(){['title-screen','intro-screen','story-screen','action-screen','game-screen','maze-screen','rooftop-screen','result-screen'].forEach(id=>document.getElementById(id).style.display='none');document.getElementById('blackout').style.display='none';document.getElementById('jumpscare').style.display='none';document.getElementById('jumpscareImg').style.display='none';document.getElementById('invOverlay').style.display='none';document.getElementById('timerDisplay').classList.remove('urgent');document.getElementById('mazeTimer').classList.remove('urgent');document.getElementById('roofTimer').classList.remove('urgent');document.getElementById('mazeDanger').style.boxShadow='none';document.getElementById('roofDanger').style.boxShadow='none';}
+function showScreen(id){document.getElementById(id).style.display='flex';}
+
+// ROOM RENDER (Stage 1 & 2)
+function renderRoom(){const rooms=currentHouse.rooms,r=rooms[S.room];document.getElementById('riName').textContent=r.label;document.getElementById('roomBg').className='room-bg '+(S.lights[S.room]?'lit':'dark');const lt=document.getElementById('lightToggle');if(r.hasLight){lt.style.display='block';lt.textContent=S.lights[S.room]?'💡 불 끄기':'🌑 불 켜기';}else lt.style.display='none';const sc=document.getElementById('sceneObjects');sc.innerHTML='';r.objects.forEach(obj=>{const d=document.createElement('div');d.className='obj'+(obj.canHide?' interactable':'');d.style.cssText=`left:${obj.x}%;top:${obj.y}%;transform:translate(-50%,-50%);`;d.innerHTML=`<span class="emoji">${obj.emoji}</span><span class="obj-label">${obj.label}</span>`;if(obj.canHide)d.onclick=()=>doHide(obj);sc.appendChild(d);});r.entries.forEach(ep=>{const d=document.createElement('div');d.className='obj interactable';d.style.cssText=`left:${ep.x}%;top:${ep.y}%;transform:translate(-50%,-50%);`;const lk=S.locks[ep.id],show=S.popups[ep.id];d.innerHTML=`<div class="status-popup ${show?(lk?'st-locked show':'st-unlocked show'):''}">${lk?'🔒 잠김':'🔓 열림'}</div><span class="emoji">${ep.emoji}</span><span class="obj-label">${ep.label}</span>`;d.onclick=()=>interactEntry(ep.id);sc.appendChild(d);});document.getElementById('hidingOverlay').style.display=S.hiding?'flex':'none';renderMinimap();}
+function interactEntry(id){if(S.phase!=='game'||S.hiding)return;if(!S.locks[id]){S.locks[id]=true;S.locked++;au.lock();}S.popups[id]=true;renderRoom();setTimeout(()=>{S.popups[id]=false;if(S.phase==='game')renderRoom();},2000);}
+function renderMinimap(){const mm=document.getElementById('minimap');mm.innerHTML='';currentHouse.mmRooms.forEach(mr=>{const d=document.createElement('div');d.className='mm-room'+(S.room===mr.id?' active':'')+(S.lights[mr.id]?' lit-r':' dark-r');d.style.cssText=`left:${mr.x}%;top:${mr.y}%;width:${mr.w}%;height:${mr.h}%;`;d.textContent=mr.label;d.onclick=()=>doMove(mr.id);mm.appendChild(d);});}
+function doLight(){if(S.phase!=='game'||S.hiding)return;S.lights[S.room]=!S.lights[S.room];S.lights[S.room]?au.lightOn():au.lightOff();renderRoom();}
+function doMove(id){if(S.phase!=='game'||S.hiding||S.room===id)return;Object.keys(S.popups).forEach(k=>S.popups[k]=false);S.room=id;au.move();renderRoom();}
+function doHide(obj){if(S.phase!=='game')return;S.hiding=true;S.hideSpot=obj.hideLabel||obj.label;document.getElementById('hidingText').textContent=`🤫 ${S.hideSpot}에 숨어 있는 중...`;au.hide();renderRoom();}
+function doUnhide(){S.hiding=false;S.hideSpot=null;renderRoom();}
+function updateTimer(){const m=Math.floor(S.timeLeft/60),s=S.timeLeft%60;document.getElementById('timerDisplay').textContent=`${m}:${s.toString().padStart(2,'0')}`;}
+function startTimer(){S.timer=setInterval(()=>{S.timeLeft--;updateTimer();if(S.timeLeft<=10&&S.timeLeft>0){document.getElementById('timerDisplay').classList.add('urgent');if(S.timeLeft%2===0)au.hb();}if(S.timeLeft<=0){clearInterval(S.timer);startInvasion();}},1000);}
+
+// STAGE 1
+function startStage1(){currentStage=1;initState(30,HOUSE1); /* ⏱️ 스테이지1 제한시간: 30초 */hideAll();showScreen('intro-screen');au.init();document.getElementById('stageBadge').textContent='STAGE 1';typeNews('인근 교도소에서 <em>흉악범이 탈옥</em>했습니다. 현재 범인은 주택가 부근에서 목격되었으며, 주민 여러분께서는 <em>모든 문과 창문을 잠그고</em> 안전한 장소에 대피하시기 바랍니다.',()=>startLockPhase());}
+function typeNews(html,cb){const el=document.getElementById('newsText');const tmp=document.createElement('div');tmp.innerHTML=html;const plain=tmp.textContent;el.innerHTML='';let i=0;(function tp(){if(i<plain.length){el.textContent=plain.substring(0,++i);setTimeout(tp,30);}else{el.innerHTML=html;setTimeout(cb,2000);}})();}
+function startLockPhase(){S.phase='game';hideAll();showScreen('game-screen');S.room='hallway';renderRoom();updateTimer();document.getElementById('minimapArea').style.display='';au.amb();startTimer();}
+
+// STAGE 2
+function startStage2(){currentStage=2;initState(20,HOUSE2); /* ⏱️ 스테이지2 제한시간: 20초 */hideAll();showScreen('intro-screen');au.init();document.getElementById('stageBadge').textContent='STAGE 2';typeNews('탈옥한 흉악범이 <em>아직 검거되지 않았습니다</em>. 주민 여러분의 각별한 주의가 필요합니다. 외출을 자제하시고 <em>수상한 사람을 발견하면 즉시 신고</em>해 주십시오.',()=>showStoryScene('fridge'));}
+function showStoryScene(scene){hideAll();showScreen('story-screen');const emoji=document.getElementById('storyEmoji'),text=document.getElementById('storyText'),choices=document.getElementById('storyChoices');choices.innerHTML='';if(scene==='fridge'){emoji.textContent='🧊';text.innerHTML='냉장고를 열어보니... <em>텅 비어있다.</em><br>먹을 것이 하나도 없다.<br>편의점에 가야 할 것 같다.';addChoice('🏪 편의점으로 가자',()=>showStoryScene('outside'));}else if(scene==='outside'){emoji.textContent='🌙';text.innerHTML='밤거리로 나왔다. 어둡고 조용하다.<br>편의점에서 라면과 물을 샀다.<br><br>편의점을 나서는 순간,<br><em>옆집에서 누군가 나온다.</em><br><br><em>흉악범이다!</em>';setTimeout(()=>au.danger(),500);addChoice('🏃 도망친다!',()=>startActionGame('escape'));}}
+function addChoice(t,cb){const b=document.createElement('button');b.className='story-choice';b.innerHTML=t;b.onclick=cb;document.getElementById('storyChoices').appendChild(b);}
+
+// ACTION MINIGAME (escape/knock)
+let actionState={clicks:0,timer:null,timeLeft:0,required:0,mode:''};
+function startActionGame(mode){
+  hideAll();showScreen('action-screen');
+  const cfg=mode==='escape'
+    ?{time:10,req:50,label:'클릭하여 도망쳐!',emoji:'🏃',tap:'연타!',msg:'미친 듯이 클릭하세요!'} /* ⏱️ 도망 미니게임: 10초, 50클릭 */
+    :{time:3,req:5,label:'문을 두드려라!',emoji:'🚪',tap:'두드려!',msg:'옆집 문을 두드리세요!'}; /* ⏱️ 문두드리기: 3초, 5클릭 */
+  actionState={clicks:0,timer:null,timeLeft:cfg.time,required:cfg.req,mode};
+  document.getElementById('actionTimer').textContent=cfg.time;document.getElementById('actionCount').textContent=`0 / ${cfg.req}`;
+  document.getElementById('actionLabel').textContent=cfg.label;document.getElementById('actionBar').style.width='0%';document.getElementById('actionBar').classList.remove('full');
+  document.getElementById('tapEmoji').textContent=cfg.emoji;document.getElementById('tapText').textContent=cfg.tap;document.getElementById('actionMsg').textContent=cfg.msg;
+  if(mode==='escape')au.amb();
+  actionState.timer=setInterval(()=>{actionState.timeLeft--;document.getElementById('actionTimer').textContent=actionState.timeLeft;if(actionState.timeLeft<=3&&mode==='escape')au.hb();if(actionState.timeLeft<=0){clearInterval(actionState.timer);if(mode==='escape')au.stopAmb();if(actionState.clicks>=actionState.required){document.getElementById('actionMsg').textContent=mode==='escape'?'도망 성공! 옆집이 보인다!':'문이 열렸다! 빨리 들어가서 잠가!';setTimeout(()=>{if(mode==='escape')startActionGame('knock');else startLockPhase();},1500);}else{showFailResult(mode==='escape'?'흉악범에게 붙잡혔습니다...':'문이 열리지 않았다... 흉악범이 다가온다...');}}},1000);
+}
+function onTap(){if(actionState.timeLeft<=0)return;actionState.clicks++;actionState.mode==='escape'?au.tap():au.knock();const pct=Math.min(100,Math.floor(actionState.clicks/actionState.required*100));document.getElementById('actionCount').textContent=`${actionState.clicks} / ${actionState.required}`;document.getElementById('actionBar').style.width=pct+'%';if(pct>=100){document.getElementById('actionBar').classList.add('full');document.getElementById('actionMsg').textContent=actionState.mode==='escape'?'도망 성공! 조금만 더!':'문이 열리고 있다!';}}
+
+function showFailResult(msg){hideAll();document.getElementById('blackout').style.display='block';setTimeout(()=>{document.getElementById('jumpscare').style.display='flex';au.scream();setTimeout(()=>{document.getElementById('jumpscare').style.display='none';document.getElementById('jumpscareImg').style.display='flex';au.t(1200,0.3,'sawtooth',0.5);au.t(80,0.5,'square',0.4);setTimeout(()=>{document.getElementById('jumpscareImg').style.display='none';showResult(false,msg,false);},1200);},3000);},800);}
+
+// INVASION
+async function startInvasion(){S.phase='invasion';au.stopAmb();document.getElementById('lightToggle').style.display='none';document.getElementById('minimapArea').style.display='none';const ov=document.getElementById('invOverlay'),tx=document.getElementById('invText');ov.style.display='flex';tx.textContent='... 밖에서 발자국 소리가 들린다 ...';for(let i=0;i<4;i++){await sleep(600);au.foot();}await sleep(600);tx.textContent='... 누군가 문을 확인하고 있다 ...';for(let i=0;i<3;i++){await sleep(700);au.rattle();document.getElementById('roomScene').classList.add('shake');await sleep(350);document.getElementById('roomScene').classList.remove('shake');}await sleep(500);const unlocked=allEntries.filter(e=>!S.locks[e.id]);if(unlocked.length===0){tx.textContent='... 모든 문이 잠겨있다 ...';await sleep(1000);au.rattle();document.getElementById('roomScene').classList.add('shake');await sleep(400);document.getElementById('roomScene').classList.remove('shake');await sleep(800);tx.textContent='... 발자국 소리가 멀어진다 ...';au.foot();await sleep(1000);au.foot();await sleep(1500);showResult(true,'',true);}else{const b=unlocked[0];S.breached=b.id;tx.textContent=`... ${b.label}이(가) 열려있다 ...`;await sleep(900);au.brk();document.getElementById('roomScene').classList.add('shake');await sleep(400);document.getElementById('roomScene').classList.remove('shake');await sleep(200);document.getElementById('blackout').style.display='block';await sleep(800);document.getElementById('jumpscare').style.display='flex';au.scream();await sleep(3000);document.getElementById('jumpscare').style.display='none';document.getElementById('jumpscareImg').style.display='flex';au.t(1200,0.3,'sawtooth',0.5);au.t(80,0.5,'square',0.4);await sleep(1200);document.getElementById('jumpscareImg').style.display='none';await sleep(400);showResult(false,`${b.label}(으)로 침입자가 들어왔습니다...`,true);}}
+
+// ========== STAGE 3: MAZE ==========
+let MZ={pos:0,exit:-1,killer:-1,visited:new Set(),timer:null,timeLeft:30,doors:[],killerTimer:null,phase:'',wrongPenalty:false};
+
+function startStage3(){
+  currentStage=3;hideAll();showScreen('intro-screen');au.init();
+  document.getElementById('stageBadge').textContent='STAGE 3';
+  typeNews('흉악범이 옆집에서 도주하여 <em>인근 폐건물</em> 방향으로 이동 중입니다. 해당 건물은 <em>미로처럼 복잡한 구조</em>로 되어 있어 접근을 삼가 주시기 바랍니다.',()=>showStoryScene3());
+}
+
+function showStoryScene3(){
+  hideAll();showScreen('story-screen');
+  document.getElementById('storyEmoji').textContent='🏚️';
+  document.getElementById('storyText').innerHTML='옆집에서 도망치다 골목 끝에 다다랐다.<br>뒤에서 <em>발자국 소리가 가까워진다.</em><br><br>앞에 낡은 폐건물이 보인다.<br>여기로 들어가서 <em>반대편 출구</em>를 찾아야 한다!';
+  document.getElementById('storyChoices').innerHTML='';
+  addChoice('🏚️ 폐건물로 들어간다!',()=>startMaze());
+}
+
+function startMaze(){
+  // Generate maze: 12 rooms (4x3 grid), each room has doors to adjacent rooms
+  // One random room (not 0) is exit, killer starts far from player
+  MZ={pos:0,exit:-1,killer:-1,visited:new Set([0]),timer:null,timeLeft:30, /* ⏱️ 스테이지3 제한시간: 30초 */doors:[],killerTimer:null,phase:'play',wrongPenalty:false};
+
+  // Build adjacency (4 cols x 3 rows)
+  // rooms numbered 0-11: row=floor(i/4), col=i%4
+  MZ.doors=[];
+  for(let i=0;i<12;i++){
+    const adj=[];const r=Math.floor(i/4),c=i%4;
+    if(c>0)adj.push(i-1);if(c<3)adj.push(i+1);if(r>0)adj.push(i-4);if(r<3)adj.push(i+4);
+    MZ.doors.push(adj);
+  }
+
+  // Exit: random room on far side (rooms 8-11)
+  MZ.exit=[8,9,10,11][Math.floor(Math.random()*4)];
+  // Among each room's doors, only ONE leads to exit path. Others are wrong (2s penalty).
+  // Precompute shortest path from each room to exit using BFS
+  MZ.pathToExit=bfsPaths(MZ.exit);
+
+  // Killer starts at room farthest from player (room 11 or so)
+  const farRooms=[8,9,10,11].filter(r=>r!==MZ.exit);
+  MZ.killer=farRooms[Math.floor(Math.random()*farRooms.length)];
+
+  hideAll();showScreen('maze-screen');au.amb();
+  renderMazeRoom();renderMazeMinimap();updateMazeTimer();
+
+  MZ.timer=setInterval(()=>{
+    MZ.timeLeft--;updateMazeTimer();
+    if(MZ.timeLeft<=10&&MZ.timeLeft>0){document.getElementById('mazeTimer').classList.add('urgent');if(MZ.timeLeft%2===0)au.hb();}
+    // Update danger edge intensity
+    const danger=Math.max(0,1-MZ.timeLeft/30);
+    document.getElementById('mazeDanger').style.boxShadow=`inset 0 0 ${60+danger*140}px rgba(139,0,0,${0.1+danger*0.6})`;
+    if(MZ.timeLeft<=0){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('시간 초과... 흉악범에게 잡혔습니다.');}
+  },1000);
+
+  // Killer moves every 4 seconds toward player
+  MZ.killerTimer=setInterval(()=>{ /* ⏱️ 흉악범 이동 간격: 4초 (낮을수록 어려움) */
+    if(MZ.phase!=='play')return;
+    moveKiller();
+    if(MZ.killer===MZ.pos){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('흉악범에게 발각되었습니다...');}
+    renderMazeMinimap();
+    // Footstep sound when killer is close
+    const dist=getDistance(MZ.pos,MZ.killer);
+    if(dist<=2)au.foot();
+  },4000);
+}
+
+function bfsPaths(target){
+  const prev=new Array(12).fill(-1);const dist=new Array(12).fill(Infinity);
+  dist[target]=0;const q=[target];
+  while(q.length){const cur=q.shift();for(const n of MZ.doors[cur]){if(dist[n]===Infinity){dist[n]=dist[cur]+1;prev[n]=cur;q.push(n);}}}
+  return{prev,dist};
+}
+function getDistance(a,b){
+  const p=bfsPaths(b);return p.dist[a];
+}
+function moveKiller(){
+  // Move killer one step toward player
+  const p=bfsPaths(MZ.pos);
+  if(p.dist[MZ.killer]<=1)return;// already adjacent or same
+  const next=p.prev[MZ.killer];
+  if(next!==-1)MZ.killer=next;
+}
+
+function updateMazeTimer(){const m=Math.floor(MZ.timeLeft/60),s=MZ.timeLeft%60;document.getElementById('mazeTimer').textContent=`${m}:${s.toString().padStart(2,'0')}`;}
+
+function renderMazeRoom(){
+  const ob=document.getElementById('mazeObjects');ob.innerHTML='';
+  document.getElementById('mazeRoomName').textContent=`방 ${MZ.pos+1}`;
+
+  // Decor
+  MAZE_DECOR[MZ.pos].forEach(d=>{
+    const el=document.createElement('div');el.className='maze-obj';
+    el.style.cssText=`left:${d.x}%;top:${d.y}%;transform:translate(-50%,-50%);`;
+    el.innerHTML=`<span class="emoji">${d.emoji}</span>`;ob.appendChild(el);
+  });
+
+  // Doors to adjacent rooms
+  const adj=MZ.doors[MZ.pos];
+  const doorPositions=[];
+  const r=Math.floor(MZ.pos/4),c=MZ.pos%4;
+  // Place doors on walls based on direction
+  adj.forEach(target=>{
+    const tr=Math.floor(target/4),tc=target%4;
+    let x,y;
+    if(tc<c){x=8;y=45;}// left
+    else if(tc>c){x=92;y=45;}// right
+    else if(tr<r){x=50;y:12;y=10;}// up
+    else{x=50;y=85;}// down
+    // Fix up case
+    if(tr<r){x=50;y=10;}
+    doorPositions.push({target,x,y});
+  });
+
+  doorPositions.forEach(dp=>{
+    const isExit=(dp.target===MZ.exit);
+    const isCorrectPath=MZ.pathToExit.prev[MZ.pos]===dp.target;
+    const el=document.createElement('div');
+    el.className='maze-obj maze-door'+(isExit?' exit-door':'');
+    el.style.cssText=`left:${dp.x}%;top:${dp.y}%;transform:translate(-50%,-50%);`;
+    el.innerHTML=`<span class="emoji">${isExit?'🚪':'🚪'}</span><span class="obj-label">${isExit?'':'방 '+(dp.target+1)}</span>`;
+    el.onclick=()=>mazeDoorClick(dp.target,isCorrectPath||isExit);
+    ob.appendChild(el);
+  });
+
+  // Show exit marker if this is the exit room
+  if(MZ.pos===MZ.exit){
+    clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';
+    setTimeout(()=>{showResult(true,'폐건물을 탈출했습니다!',false);},500);
+  }
+}
+
+function mazeDoorClick(target,isCorrect){
+  if(MZ.phase!=='play'||MZ.wrongPenalty)return;
+  if(!isCorrect){
+    // Wrong door: 2 second penalty
+    au.wrong();MZ.wrongPenalty=true;MZ.timeLeft=Math.max(0,MZ.timeLeft-2);updateMazeTimer(); /* ⏱️ 오답 문 패널티: -2초 */
+    const rv=document.getElementById('mazeRoomView');rv.classList.add('maze-wrong-flash');
+    showMazeMsg('막다른 길! (-2초)');
+    setTimeout(()=>{rv.classList.remove('maze-wrong-flash');MZ.wrongPenalty=false;},500);
+    return;
+  }
+  // Correct door - move
+  au.doorOpen();MZ.pos=target;MZ.visited.add(target);
+  // Check if killer is here
+  if(MZ.killer===MZ.pos){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('흉악범과 마주쳤습니다...');return;}
+  renderMazeRoom();renderMazeMinimap();
+}
+
+function showMazeMsg(msg){const el=document.getElementById('mazeMsg');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),1500);}
+
+function renderMazeMinimap(){
+  const mm=document.getElementById('mazeMinimap');mm.innerHTML='';
+  for(let i=0;i<12;i++){
+    const d=document.createElement('div');
+    let cls='maze-mm-cell';
+    if(i===MZ.pos)cls+=' mm-current';
+    else if(MZ.visited.has(i))cls+=' mm-visited';
+    if(i===MZ.exit)cls+=' mm-exit';
+    // Show killer on minimap with flicker (only when close or sometimes)
+    const killerDist=getDistance(MZ.pos,MZ.killer);
+    if(i===MZ.killer&&(killerDist<=3||Math.random()<0.3))cls+=' mm-killer';
+    d.className=cls;
+    d.textContent=i===MZ.pos?'📍':(i===MZ.exit?'🚪':'');
+    mm.appendChild(d);
+  }
+}
+
+// ========== STAGE 4: ROOFTOP ESCAPE ==========
+let RF={floor:1,maxFloor:5,phase:'',timer:null,timeLeft:40,climbClicks:0,climbNeeded:20,
+  obstacleActive:false,correctSide:'',code:[],input:[],codeHints:[],attempt:0};
+
+function startStage4(){
+  currentStage=4;hideAll();showScreen('intro-screen');au.init();
+  document.getElementById('stageBadge').textContent='STAGE 4';
+  typeNews('흉악범이 폐건물 내부에서 <em>무기를 소지</em>한 것으로 확인되었습니다. 경찰 헬기가 <em>옥상으로 출동</em> 중이며, 주민 여러분은 <em>높은 곳으로 대피</em>하시기 바랍니다.',()=>showStoryScene4());
+}
+
+function showStoryScene4(){
+  hideAll();showScreen('story-screen');
+  document.getElementById('storyEmoji').textContent='🏢';
+  document.getElementById('storyText').innerHTML='폐건물을 빠져나왔지만...<br>흉악범이 <em>바로 뒤에 있다!</em><br><br>저 멀리 경찰 헬기 소리가 들린다.<br><em>옥상까지 올라가면 구출될 수 있다!</em><br><br>5층까지 계단을 올라가야 한다!';
+  document.getElementById('storyChoices').innerHTML='';
+  addChoice('🏃 계단으로 뛴다!',()=>startRooftop());
+}
+
+function startRooftop(){
+  RF={floor:1,maxFloor:5,phase:'climb',timer:null,timeLeft:60, /* ⏱️ 스테이지4 제한시간: 60초 */climbClicks:0,climbNeeded:20,
+    obstacleActive:false,correctSide:'',code:generateCode(),input:[],attempt:0};
+  RF.codeHints=generateHints(RF.code);
+  hideAll();showScreen('rooftop-screen');au.amb();
+  updateRoofTimer();renderFloor();startRoofTimer();
+  startClimbPhase();
+}
+
+function generateCode(){return [1,2,3,4].map(()=>Math.floor(Math.random()*10));}
+function generateHints(code){
+  const hints=[];
+  const hintTemplates=[
+    (d)=>`첫째 자리: ${d} 보다 ${code[0]>d?'큼':'작거나 같음'}`,
+    (d)=>`둘째 자리: ${code[1]%2===0?'짝수':'홀수'}`,
+    (d)=>`셋째 자리: ${code[2]<5?'5 미만':'5 이상'}`,
+    (d)=>`넷째 자리: ${code[3]}`,
+  ];
+  hintTemplates.forEach((fn,i)=>{
+    const dummy=Math.floor(Math.random()*10);
+    hints.push(fn(dummy));
+  });
+  return hints;
+}
+
+function startRoofTimer(){
+  RF.timer=setInterval(()=>{
+    RF.timeLeft--;updateRoofTimer();
+    const danger=Math.max(0,1-RF.timeLeft/60);
+    document.getElementById('roofDanger').style.boxShadow=`inset 0 0 ${50+danger*150}px rgba(139,0,0,${0.05+danger*0.5})`;
+    if(RF.timeLeft<=10&&RF.timeLeft>0){document.getElementById('roofTimer').classList.add('urgent');if(RF.timeLeft%2===0)au.hb();}
+    if(RF.timeLeft<=0){clearInterval(RF.timer);au.stopAmb();RF.phase='done';showFailResult('시간 초과... 흉악범에게 잡혔습니다.');}
+  },1000);
+}
+function updateRoofTimer(){const m=Math.floor(RF.timeLeft/60),s=RF.timeLeft%60;document.getElementById('roofTimer').textContent=`${m}:${s.toString().padStart(2,'0')}`;}
+
+function renderFloor(){
+  document.getElementById('floorIndicator').innerHTML=`<em>${RF.floor}F</em> / ${RF.maxFloor}F`;
+  document.getElementById('roofFloorName').textContent=RF.floor>=RF.maxFloor?'옥상':`${RF.floor}층`;
+  // Stair progress
+  const sv=document.getElementById('stairVisual');sv.innerHTML='';
+  for(let i=1;i<=RF.maxFloor;i++){
+    const s=document.createElement('div');s.className='stair-step'+(i<RF.floor?' done':'')+(i===RF.floor?' current':'');
+    const w=100/RF.maxFloor;
+    s.style.cssText=`left:${(i-1)*w}%;width:${w-1}%;`;
+    sv.appendChild(s);
+  }
+  // Player marker
+  const p=document.createElement('div');p.className='stair-player';
+  p.style.left=((RF.floor-0.5)/RF.maxFloor*100)+'%';
+  p.textContent='🏃';sv.appendChild(p);
+}
+
+function startClimbPhase(){
+  RF.phase='climb';RF.climbClicks=0;
+  RF.climbNeeded=15+RF.floor*5;// ⏱️ 층별 필요 클릭수: 1층=20, 2층=25, 3층=30, 4층=35
+  document.getElementById('obstacleArea').innerHTML='<div style="text-align:center;color:var(--text-dim);font-size:clamp(0.7rem,1.8vw,0.85rem);padding-top:20px;">계단 위를 클릭하여 올라가세요!</div>';
+  const ca=document.getElementById('roofClimbArea');ca.style.display='block';
+  document.getElementById('roofClimbBar').style.width='0%';
+  document.getElementById('roofClimbBar').classList.remove('full');
+  document.getElementById('roofClimbLabel').textContent=`연타! (${RF.climbNeeded}번)`;
+  document.getElementById('keypadOverlay').style.display='none';
+}
+
+function onRoofTap(){
+  if(RF.phase==='climb'){
+    RF.climbClicks++;au.tap();
+    const pct=Math.min(100,Math.floor(RF.climbClicks/RF.climbNeeded*100));
+    document.getElementById('roofClimbBar').style.width=pct+'%';
+    document.getElementById('roofClimbLabel').textContent=`${RF.climbClicks} / ${RF.climbNeeded}`;
+    if(RF.climbClicks>=RF.climbNeeded){
+      document.getElementById('roofClimbBar').classList.add('full');
+      RF.phase='wait';
+      if(RF.floor<RF.maxFloor){
+        // Show hint for this floor
+        showFloorHint();
+        setTimeout(()=>startObstacle(),1500);
+      }else{
+        // Reached rooftop!
+        document.getElementById('roofClimbArea').style.display='none';
+        document.getElementById('obstacleArea').innerHTML='<div style="text-align:center;color:var(--gold);font-size:clamp(0.9rem,2.2vw,1.1rem);padding-top:20px;">옥상에 도착했다! 하지만 문이 잠겨있다!</div>';
+        setTimeout(()=>startKeypad(),2000);
+      }
+    }
+  }
+}
+
+function showFloorHint(){
+  const idx=RF.floor-1;
+  if(idx<RF.codeHints.length){
+    const oa=document.getElementById('obstacleArea');
+    oa.innerHTML=`<div style="text-align:center;padding:10px;"><div style="font-size:clamp(0.6rem,1.4vw,0.75rem);color:var(--text-dim);margin-bottom:8px;">📋 비밀번호 힌트 ${RF.floor}/4</div><div style="font-size:clamp(0.8rem,2vw,0.95rem);color:var(--gold);letter-spacing:1px;">${RF.codeHints[idx]}</div></div>`;
+  }
+}
+
+function startObstacle(){
+  RF.phase='obstacle';RF.obstacleActive=true;
+  const obstacles=['🪨','🛢️','📦','⚡','🔥'];
+  const ob=obstacles[Math.floor(Math.random()*obstacles.length)];
+  RF.correctSide=Math.random()<0.5?'left':'right';
+  const throwSide=RF.correctSide==='left'?'right':'left';
+
+  const oa=document.getElementById('obstacleArea');
+  oa.innerHTML=`
+    <div class="obstacle-prompt">⚠️ 장애물이 날아온다! 피하세요!</div>
+    <div class="obstacle-item" id="obstacleItem" style="${throwSide}:10%;top:30%;">${ob}</div>
+    <div class="obstacle-choices">
+      <button class="obstacle-btn" id="dodgeLeft" onclick="dodge('left')">⬅ 왼쪽</button>
+      <button class="obstacle-btn" id="dodgeRight" onclick="dodge('right')">➡ 오른쪽</button>
+    </div>`;
+  
+  // Animate obstacle flying
+  setTimeout(()=>{
+    const item=document.getElementById('obstacleItem');
+    if(item){item.style[throwSide]='45%';item.style.opacity='0.3';}
+  },100);
+
+  // Auto-fail if no response in 2 seconds
+  RF._obstacleTimeout=setTimeout(()=>{
+    if(RF.phase==='obstacle'){dodge('timeout');}
+  },2000); /* ⏱️ 장애물 회피 제한시간: 2초 */
+}
+
+function dodge(side){
+  if(RF.phase!=='obstacle')return;
+  clearTimeout(RF._obstacleTimeout);
+  RF.phase='wait';RF.obstacleActive=false;
+  
+  const correct=side===RF.correctSide;
+  if(correct){
+    au.move();
+    const btn=document.getElementById(side==='left'?'dodgeLeft':'dodgeRight');
+    if(btn)btn.classList.add('correct');
+    setTimeout(()=>{
+      RF.floor++;renderFloor();startClimbPhase();
+    },800);
+  }else{
+    au.wrong();RF.timeLeft=Math.max(0,RF.timeLeft-3);updateRoofTimer(); /* ⏱️ 장애물 피격 패널티: -3초 */
+    const oa=document.getElementById('obstacleArea');
+    oa.innerHTML=`<div style="text-align:center;color:var(--warning);font-size:clamp(0.9rem,2.2vw,1.1rem);padding-top:30px;">💥 맞았다! (-3초)</div>`;
+    if(side==='timeout')oa.innerHTML=`<div style="text-align:center;color:var(--warning);font-size:clamp(0.9rem,2.2vw,1.1rem);padding-top:30px;">💥 너무 늦었다! (-3초)</div>`;
+    setTimeout(()=>{RF.floor++;renderFloor();startClimbPhase();},1000);
+  }
+}
+
+function startKeypad(){
+  RF.phase='keypad';RF.input=[];RF.attempt=0;
+  document.getElementById('roofClimbArea').style.display='none';
+  document.getElementById('obstacleArea').innerHTML='';
+  const kp=document.getElementById('keypadOverlay');kp.style.display='flex';
+  renderKeypadDisplay();
+  // Build keypad grid
+  const grid=document.getElementById('keypadGrid');grid.innerHTML='';
+  for(let i=1;i<=9;i++){const b=document.createElement('button');b.className='keypad-btn';b.textContent=i;b.onclick=()=>keypadInput(i);grid.appendChild(b);}
+  const bC=document.createElement('button');bC.className='keypad-btn';bC.textContent='⌫';bC.onclick=()=>keypadDelete();grid.appendChild(bC);
+  const b0=document.createElement('button');b0.className='keypad-btn';b0.textContent='0';b0.onclick=()=>keypadInput(0);grid.appendChild(b0);
+  const bE=document.createElement('button');bE.className='keypad-btn';bE.textContent='✓';bE.style.color='var(--safe)';bE.onclick=()=>keypadSubmit();grid.appendChild(bE);
+  // Show all hints
+  document.getElementById('keypadHint').innerHTML=RF.codeHints.map((h,i)=>`힌트${i+1}: ${h}`).join('<br>');
+}
+
+function renderKeypadDisplay(){
+  const disp=RF.input.map(d=>d).join('');
+  const remaining='_'.repeat(4-RF.input.length);
+  document.getElementById('keypadDisplay').textContent=disp+remaining;
+}
+function keypadInput(n){if(RF.phase!=='keypad'||RF.input.length>=4)return;RF.input.push(n);au.tap();renderKeypadDisplay();}
+function keypadDelete(){if(RF.phase!=='keypad'||RF.input.length===0)return;RF.input.pop();renderKeypadDisplay();}
+function keypadSubmit(){
+  if(RF.phase!=='keypad'||RF.input.length!==4)return;
+  const correct=RF.input.every((d,i)=>d===RF.code[i]);
+  if(correct){
+    RF.phase='done';clearInterval(RF.timer);au.stopAmb();
+    document.getElementById('keypadDisplay').textContent='OPEN';
+    document.getElementById('keypadDisplay').style.color='var(--safe)';
+    au.lock();
+    setTimeout(()=>{
+      showResult(true,'헬기를 타고 탈출했습니다! 흉악범은 경찰에 체포되었습니다.',false);
+    },1500);
+  }else{
+    RF.attempt++;RF.input=[];RF.timeLeft=Math.max(0,RF.timeLeft-3);updateRoofTimer(); /* ⏱️ 비밀번호 오답 패널티: -3초 */
+    au.wrong();
+    document.getElementById('keypadDisplay').textContent='✗✗✗✗';
+    document.getElementById('keypadDisplay').style.color='var(--warning)';
+    setTimeout(()=>{document.getElementById('keypadDisplay').style.color='var(--gold)';renderKeypadDisplay();},600);
+  }
+}
+
+// RESULT
+function showResult(win,msg,showMap){
+  hideAll();const rs=document.getElementById('result-screen');rs.className=win?'win':'lose';showScreen('result-screen');
+  document.getElementById('resultTitle').textContent=win?'생존 성공':'사 망';
+  document.getElementById('resultSub').textContent=win?(currentStage===3?'폐건물에서 탈출했습니다!':(currentStage===4?msg:getWinMsg())):msg;
+  const statsEl=document.getElementById('resultStats'),mapC=document.getElementById('resultMapContainer');
+  if(showMap&&currentStage<=2){renderStats();renderResultMap();statsEl.style.display='flex';mapC.style.display='block';}
+  else if(currentStage===3&&win){
+    statsEl.innerHTML=`<div class="stat-item"><div class="stat-value" style="color:var(--safe)">${MZ.visited.size}/12</div><div class="stat-label">탐색한 방</div></div><div class="stat-item"><div class="stat-value">${30-MZ.timeLeft}초</div><div class="stat-label">소요 시간</div></div>`;
+    statsEl.style.display='flex';mapC.style.display='none';
+  }else if(currentStage===4&&win){
+    statsEl.innerHTML=`<div class="stat-item"><div class="stat-value" style="color:var(--safe)">5F</div><div class="stat-label">도달 층</div></div><div class="stat-item"><div class="stat-value">${60-RF.timeLeft}초</div><div class="stat-label">소요 시간</div></div><div class="stat-item"><div class="stat-value">${RF.attempt}</div><div class="stat-label">오답 횟수</div></div>`;
+    statsEl.style.display='flex';mapC.style.display='none';
+  }else{statsEl.style.display='none';mapC.style.display='none';}
+  const nextBtn=document.getElementById('nextStageBtn'),retryBtn=document.getElementById('retryBtn');
+  if(win&&currentStage===1){nextBtn.style.display='block';nextBtn.textContent='스테이지 2 →';retryBtn.textContent='스테이지 1 다시';}
+  else if(win&&currentStage===2){nextBtn.style.display='block';nextBtn.textContent='스테이지 3 →';retryBtn.textContent='스테이지 2 다시';}
+  else if(win&&currentStage===3){nextBtn.style.display='block';nextBtn.textContent='스테이지 4 →';retryBtn.textContent='스테이지 3 다시';}
+  else if(win&&currentStage===4){nextBtn.style.display='none';retryBtn.textContent='처음부터';}
+  else{nextBtn.style.display='none';const labels={1:'다시 도전',2:'스테이지 2 다시',3:'스테이지 3 다시',4:'스테이지 4 다시'};retryBtn.textContent=labels[currentStage]||'다시 도전';}
+  if(win)au.win();
+}
+function getWinMsg(){const off=Object.values(S.lights).filter(v=>!v).length;if(S.hiding&&off>=3)return'완벽한 방어!';if(S.hiding)return'은신처에 숨어 무사히 생존했습니다.';return'모든 문을 잠그고 밤을 버텼습니다!';}
+function renderStats(){const el=document.getElementById('resultStats'),off=Object.values(S.lights).filter(v=>!v).length,tl=Object.keys(S.lights).length;el.innerHTML=`<div class="stat-item"><div class="stat-value" style="color:${S.locked===S.total?'var(--safe)':'var(--warning)'}">${S.locked}/${S.total}</div><div class="stat-label">잠금</div></div><div class="stat-item"><div class="stat-value">${off}/${tl}</div><div class="stat-label">소등</div></div><div class="stat-item"><div class="stat-value">${S.hiding?'✓':'✗'}</div><div class="stat-label">은신</div></div>`;}
+function renderResultMap(){const map=document.getElementById('resultMap');map.innerHTML='';currentHouse.rmRooms.forEach(mr=>{const d=document.createElement('div');d.className='rmap-room '+(S.lights[mr.id]?'lit':'dark-room');d.style.cssText=`left:${mr.x}%;top:${mr.y}%;width:${mr.w}%;height:${mr.h}%;`;d.textContent=currentHouse.rooms[mr.id].label;map.appendChild(d);});currentHouse.rmEps.forEach(me=>{const d=document.createElement('div');const lk=S.locks[me.id],br=S.breached===me.id;d.className='rmap-ep '+(br?'breached':(lk?'locked':'unlocked'));d.style.cssText=`left:${me.x}%;top:${me.y}%;`;d.textContent=lk?'🔒':'🔓';const l=document.createElement('span');l.className='rmap-ep-label';l.textContent=me.label;d.appendChild(l);map.appendChild(d);});}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// EVENTS
+document.getElementById('startBtn').onclick=()=>startStage1();
+document.getElementById('retryBtn').onclick=()=>{if(currentStage===1)startStage1();else if(currentStage===2)startStage2();else if(currentStage===3)startStage3();else startStage4();};
+document.getElementById('nextStageBtn').onclick=()=>{if(currentStage===1)startStage2();else if(currentStage===2)startStage3();else if(currentStage===3)startStage4();};
+document.getElementById('audioToggle').onclick=()=>au.toggle();
+document.getElementById('lightToggle').onclick=()=>doLight();
+document.getElementById('unhideBtn').onclick=doUnhide;
+document.getElementById('tapArea').addEventListener('mousedown',onTap);
+document.getElementById('tapArea').addEventListener('touchstart',(e)=>{e.preventDefault();onTap();},{passive:false});
+// Rooftop tap - use the entire roof scene
+document.getElementById('roofScene').addEventListener('mousedown',(e)=>{if(e.target.closest('.obstacle-btn,.keypad-btn,.keypad-overlay'))return;onRoofTap();});
+document.getElementById('roofScene').addEventListener('touchstart',(e)=>{if(e.target.closest('.obstacle-btn,.keypad-btn,.keypad-overlay'))return;e.preventDefault();onRoofTap();},{passive:false});
+let lt=0;document.addEventListener('touchend',e=>{const n=Date.now();if(n-lt<300)e.preventDefault();lt=n;},{passive:false});
+initState(30,HOUSE1);
+</script>
+</body>
+</html>
