@@ -1,16 +1,72 @@
-import streamlit as st
-import numpy as np
-import pandas as pd
-import random
-import hashlib
-from datetime import datetime
-import warnings
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lotto DNA Analyzer Standalone</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --bg: #f4f7f6;
+            --card: #ffffff;
+        }
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: var(--bg); color: var(--primary); margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        header { text-align: center; border-bottom: 3px solid var(--accent); padding-bottom: 10px; margin-bottom: 30px; }
+        .config-section { background: var(--card); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+        input, button { padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
+        button { background-color: var(--accent); color: white; border: none; cursor: pointer; font-weight: bold; }
+        button:hover { background-color: #2980b9; }
+        .tabs { display: flex; gap: 5px; }
+        .tab { padding: 10px 20px; background: #ddd; cursor: pointer; border-radius: 5px 5px 0 0; }
+        .tab.active { background: var(--card); font-weight: bold; border-top: 3px solid var(--accent); }
+        .tab-content { display: none; background: var(--card); padding: 20px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .tab-content.active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; text-align: center; border-bottom: 1px solid #eee; }
+        .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
+        .result-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; text-align: center; background: #fafafa; }
+        .lotto-numbers { font-size: 1.1em; font-weight: bold; color: #e74c3c; margin: 10px 0; }
+        .loading { display: none; font-weight: bold; color: var(--accent); }
+    </style>
+</head>
+<body>
 
-warnings.filterwarnings('ignore')
+<div class="container">
+    <header>
+        <h1>🧬 Lotto DNA Analyzer v4.0</h1>
+        <p>Standalone HTML Version (Internal Data Integration)</p>
+    </header>
 
-# --- [DBA 관리 영역] 당첨 번호 히스토리 데이터 배열 ---
-# 최신 회차가 추가될 때마다 이 리스트에 [회차, 날짜, 1, 2, 3, 4, 5, 6, 보너스]를 추가하면 됩니다.
-LOTTO_HISTORY_DATA = [
+    <div class="config-section">
+        <label>생년월일: <input type="text" id="birthDate" value="19770726" size="10"></label>
+        <label>검증 윈도우: <input type="number" id="windowSize" value="30" style="width: 50px;"></label>
+        <button onclick="runAnalysis()">🚀 분석 및 생성</button>
+        <span id="loadingStatus" class="loading">데이터 시뮬레이션 중...</span>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('tab1')">🎯 추천 조합</div>
+        <div class="tab" onclick="showTab('tab2')">📜 당첨 히스토리</div>
+    </div>
+
+    <div id="tab1" class="tab-content active">
+        <div id="summary"></div>
+        <div class="result-grid" id="resultGrid"></div>
+    </div>
+
+    <div id="tab2" class="tab-content">
+        <table id="historyTable">
+            <thead><tr><th>회차</th><th>날짜</th><th>당첨번호</th><th>보너스</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // [DBA 영역] 데이터 배열 (여기에 최신 회차를 계속 추가하시면 됩니다)
+    const HISTORY = [
     [1, "2002-12-07",  10, 23, 29, 33, 37, 40, 16],  
     [2, "2002-12-14",  9, 13, 21, 25, 32, 42, 2],  
     [3, "2002-12-21",  11, 16, 19, 21, 27, 31, 30],  
@@ -1229,123 +1285,102 @@ LOTTO_HISTORY_DATA = [
     [1216, "2026-03-21",  3, 10, 14, 15, 23, 24, 25],  
     [1217, "2026-03-28",  8, 10, 15, 20, 29, 31, 41],  
     [1218, "2026-04-04",  3, 28, 31, 32, 42, 45, 25],  
-    [1219, "2026-04-11",  1, 2, 15, 28, 39, 45, 31],  
-    # ... (데이터 압축을 위해 이전 데이터는 생략 가능하며, 여기에 전체 데이터를 paste 하시면 됩니다)
-    # [회차, 날짜, 1번, 2번, 3번, 4번, 5번, 6번, 보너스]
-]
+    [1219, "2026-04-11",  1, 2, 15, 28, 39, 45, 31]
+    ];
 
-# --- 데이터 전처리 ---
-df = pd.DataFrame(LOTTO_HISTORY_DATA, columns=['회차', '날짜', '1번', '2번', '3번', '4번', '5번', '6번', '보너스'])
-df = df.sort_values('회차')
+    function showTab(id) {
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
 
-# --- 데이터 분석 엔진 ---
-class StrategicLottoAgent:
-    def __init__(self, birth_date, history_df):
-        self.birth_date = birth_date
-        self.df = history_df
-        self.all_nums = self.df[['1번', '2번', '3번', '4번', '5번', '6번']].values.flatten().astype(int)
+    function mulberry32(a) {
+        return function() {
+            var t = a += 0x6D2B79F5;
+            t = Math.imul(t ^ t >>> 15, t | 1);
+            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        }
+    }
 
-    def get_seed(self, label, date_str):
-        hash_val = hashlib.sha256(f"{label}_{date_str}_{self.birth_date}".encode()).hexdigest()
-        return int(hash_val[:8], 16)
+    function getSeed(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        return Math.abs(hash);
+    }
 
-    def run_simulation(self, model_id, weight_step, date_str):
-        seed = self.get_seed(f"{model_id}_{weight_step}", date_str)
-        random.seed(seed); np.random.seed(seed)
-        
-        if model_id.startswith("M"):
-            m_idx = int(model_id[1:3])
-            current_r = 3.5 + (m_idx * 0.015) + (weight_step * 0.01)
-            if current_r >= 4.0: current_r = 3.99
-            x = (seed % 1000) / 1000
-            pool = []
-            for _ in range(40):
-                x = current_r * x * (1 - x)
-                val = int(x * 45) + 1
-                if 1 <= val <= 45: pool.append(val)
-            res = list(set(pool))
-            return sorted(random.sample(res, 6)) if len(res) >= 6 else sorted(random.sample(range(1, 46), 6))
+    function runSimulation(mId, step, dateStr, birthDate) {
+        const seed = getSeed(mId + step + dateStr + birthDate);
+        const rand = mulberry32(seed);
+        if (mId.startsWith('M')) {
+            let r = 3.5 + (parseInt(mId.slice(1)) * 0.015) + (step * 0.01);
+            if (r >= 4.0) r = 3.99;
+            let x = (seed % 1000) / 1000;
+            let pool = [];
+            for (let i = 0; i < 40; i++) {
+                x = r * x * (1 - x);
+                pool.push(Math.floor(x * 45) + 1);
+            }
+            return [...new Set(pool)].filter(n => n >= 1 && n <= 45).slice(0, 6).sort((a,b)=>a-b);
+        }
+        // Fallback random
+        let res = [];
+        while(res.length < 6) { let n = Math.floor(rand() * 45) + 1; if(!res.includes(n)) res.push(n); }
+        return res.sort((a,b)=>a-b);
+    }
 
-        elif model_id.startswith("T"):
-            t_idx = int(model_id[1:3])
-            current_decay = 0.05 * weight_step
-            window = 5 + (t_idx * 5)
-            # 윈도우 크기가 데이터보다 크면 전체 데이터 사용
-            recent_nums = self.all_nums[-(window*6):] if len(self.all_nums) >= (window*6) else self.all_nums
-            counts = pd.Series(recent_nums).value_counts().reindex(range(1, 46), fill_value=0).sort_index()
-            weights = (counts.max() + 1) - (counts * current_decay)
-            weights = weights.clip(lower=0.1)
-            probs = weights / weights.sum()
-            return sorted(np.random.choice(range(1, 46), size=6, replace=False, p=probs.values).tolist())
-        return sorted(random.sample(range(1, 46), 6))
+    function runAnalysis() {
+        const birth = document.getElementById('birthDate').value;
+        const win = parseInt(document.getElementById('windowSize').value);
+        const loading = document.getElementById('loadingStatus');
+        loading.style.display = 'inline';
 
-# --- Streamlit UI ---
-st.set_page_config(page_title="Lotto DNA Standalone", layout="wide")
-st.title("🧬 Lotto DNA Analyzer v3.0 (Standalone)")
-st.markdown("CSV 파일 없이 **내장 데이터**로 작동하는 독립형 분석기")
-
-with st.sidebar:
-    st.header("⚙️ 분석 설정")
-    birth_date = st.text_input("생년월일 (8자리)", value="19770726")
-    analysis_window = st.slider("성능 검증 윈도우 (회차)", 5, len(df), min(10, len(df)))
-    st.info(f"현재 DB 적재량: {len(df)}개 회차")
-
-tab1, tab2 = st.tabs(["🎯 실전 번호 생성", "📜 데이터베이스 관리"])
-
-agent = StrategicLottoAgent(birth_date, df)
-
-with tab1:
-    if st.button("🚀 최적 가중치 분석 및 번호 생성"):
-        candidate_models = [f"M{i:02d}" for i in range(1, 11)] + [f"T{i:02d}" for i in range(1, 11)]
-        recent_data = df.tail(analysis_window)
-        
-        with st.spinner('내장 DB 분석 중...'):
-            model_stats = []
-            for m_id in candidate_models:
-                for step in range(1, 7):
-                    hits, total_prize = 0, 0
-                    for _, row in recent_data.iterrows():
-                        actual = {int(row[f'{i}번']) for i in range(1, 7)}
-                        bonus = int(row['보너스'])
-                        pred = set(agent.run_simulation(m_id, step, row['날짜']))
-                        match = len(pred & actual)
-                        
-                        prize = 0
-                        if match >= 3:
-                            hits += 1
-                            if match == 6: prize = 2000000000
-                            elif match == 5 and bonus in pred: prize = 50000000
-                            elif match == 5: prize = 1500000
-                            elif match == 4: prize = 50000
-                            elif match == 3: prize = 5000
-                        total_prize += prize
-                    
-                    win_rate = (hits / analysis_window) * 100
-                    roi = (total_prize / (analysis_window * 1000)) * 100
-                    model_stats.append({'Model': f"{m_id}_S{step}", 'ROI(%)': roi, 'WinRate(%)': win_rate})
-
-            perf_df = pd.DataFrame(model_stats).sort_values(['ROI(%)', 'WinRate(%)'], ascending=False).head(5)
+        setTimeout(() => {
+            const recent = HISTORY.slice(0, win);
+            let results = [];
+            ['M07','M12','M22','T20','T16'].forEach(mId => {
+                for(let s=1; s<=6; s++) {
+                    let hits = 0, prize = 0;
+                    recent.forEach(row => {
+                        const actual = row.slice(2, 8);
+                        const pred = runSimulation(mId, s, row[1], birth);
+                        const match = pred.filter(n => actual.includes(n)).length;
+                        if(match === 3) { hits++; prize += 5000; }
+                        else if(match === 4) { hits++; prize += 50000; }
+                        else if(match >= 5) { hits++; prize += 1500000; }
+                    });
+                    results.push({ id: mId, step: s, roi: (prize/(win*1000))*100, wr: (hits/win)*100 });
+                }
+            });
             
-            st.subheader("🏆 최적 가중치 분석 결과")
-            st.table(perf_df)
+            results.sort((a,b) => b.roi - a.roi);
+            render(results.slice(0, 5), birth);
+            loading.style.display = 'none';
+        }, 50);
+    }
 
-            st.divider()
+    function render(top5, birth) {
+        const grid = document.getElementById('resultGrid');
+        const today = new Date().toISOString().split('T')[0];
+        grid.innerHTML = '';
+        top5.forEach((m, i) => {
+            const pick = runSimulation(m.id, m.step, today, birth);
+            grid.innerHTML += `
+                <div class="result-card">
+                    <h4>${m.id}_S${m.step}</h4>
+                    <p>ROI: ${Math.round(m.roi)}%</p>
+                    <div class="lotto-numbers">${pick.join(', ')}</div>
+                    <p style="font-size:0.8em">최근 승률: ${m.wr.toFixed(1)}%</p>
+                </div>`;
+        });
+    }
 
-            st.subheader("🎯 이번 주 실전 추천 조합")
-            cols = st.columns(5)
-            next_date = datetime.now().strftime("%Y-%m-%d")
-
-            for i, (idx, row) in enumerate(perf_df.iterrows()):
-                m_info = row['Model'].split('_')
-                m_id, step = m_info[0], int(m_info[1][1:])
-                pick = agent.run_simulation(m_id, step, next_date)
-                with cols[i]:
-                    st.metric(label=f"세트 {i+1}", value=f"{row['ROI(%)']:.0f}%")
-                    st.code(f"{pick}", language='python')
-            st.success("데이터 무결성 검증 완료.")
-
-with tab2:
-    st.subheader("📊 내장 데이터베이스 현황")
-    st.dataframe(df.sort_values('회차', ascending=False), use_container_width=True, hide_index=True)
-    
-    st.info("데이터를 업데이트하려면 코드 내의 'LOTTO_HISTORY_DATA' 배열에 최신 회차를 추가하세요.")
+    // 히스토리 초기화
+    const tbody = document.querySelector('#historyTable tbody');
+    HISTORY.forEach(row => {
+        tbody.innerHTML += `<tr><td>${row[0]}</td><td>${row[1]}</td><td>${row.slice(2,8).join(', ')}</td><td>${row[8]}</td></tr>`;
+    });
+</script>
+</body>
+</html>
