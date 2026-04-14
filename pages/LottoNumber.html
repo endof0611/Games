@@ -5,29 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lotto DNA Analyzer Standalone</title>
     <style>
-        :root {
-            --primary: #2c3e50;
-            --accent: #3498db;
-            --bg: #f4f7f6;
-            --card: #ffffff;
-        }
+        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f4f7f6; --card: #ffffff; }
         body { font-family: 'Malgun Gothic', sans-serif; background-color: var(--bg); color: var(--primary); margin: 0; padding: 20px; }
-        .container { max-width: 1000px; margin: 0 auto; }
+        .container { max-width: 1100px; margin: 0 auto; }
         header { text-align: center; border-bottom: 3px solid var(--accent); padding-bottom: 10px; margin-bottom: 30px; }
         .config-section { background: var(--card); padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
         input, button { padding: 10px; border-radius: 5px; border: 1px solid #ddd; }
         button { background-color: var(--accent); color: white; border: none; cursor: pointer; font-weight: bold; }
-        button:hover { background-color: #2980b9; }
         .tabs { display: flex; gap: 5px; }
         .tab { padding: 10px 20px; background: #ddd; cursor: pointer; border-radius: 5px 5px 0 0; }
         .tab.active { background: var(--card); font-weight: bold; border-top: 3px solid var(--accent); }
         .tab-content { display: none; background: var(--card); padding: 20px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
         .tab-content.active { display: block; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
         th, td { padding: 10px; text-align: center; border-bottom: 1px solid #eee; }
-        .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-top: 20px; }
-        .result-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; text-align: center; background: #fafafa; }
-        .lotto-numbers { font-size: 1.1em; font-weight: bold; color: #e74c3c; margin: 10px 0; }
+        .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px; }
+        .result-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; text-align: center; background: #fafafa; position: relative; }
+        .lotto-numbers { font-size: 1.1em; font-weight: bold; color: #e74c3c; margin: 10px 0; background: #fff; padding: 5px; border-radius: 4px; }
+        .prize-badge { font-size: 0.8em; color: #7f8c8d; margin-top: 5px; line-height: 1.4; }
         .loading { display: none; font-weight: bold; color: var(--accent); }
     </style>
 </head>
@@ -35,20 +30,20 @@
 
 <div class="container">
     <header>
-        <h1>🧬 Lotto DNA Analyzer v4.0</h1>
-        <p>Standalone HTML Version (Internal Data Integration)</p>
+        <h1>🧬 Lotto DNA Analyzer v4.5</h1>
+        <p>GitHub Pages Ready (상세 당첨 이력 분석 포함)</p>
     </header>
 
     <div class="config-section">
         <label>생년월일: <input type="text" id="birthDate" value="19770726" size="10"></label>
-        <label>검증 윈도우: <input type="number" id="windowSize" value="30" style="width: 50px;"></label>
-        <button onclick="runAnalysis()">🚀 분석 및 생성</button>
-        <span id="loadingStatus" class="loading">데이터 시뮬레이션 중...</span>
+        <label>검증 윈도우: <input type="number" id="windowSize" value="30" style="width: 60px;"></label>
+        <button onclick="runAnalysis()">🚀 분석 및 번호 생성</button>
+        <span id="loadingStatus" class="loading">백테스팅 수행 중...</span>
     </div>
 
     <div class="tabs">
-        <div class="tab active" onclick="showTab('tab1')">🎯 추천 조합</div>
-        <div class="tab" onclick="showTab('tab2')">📜 당첨 히스토리</div>
+        <div class="tab active" onclick="showTab('tab1')">🎯 최적화 모델 & 추천</div>
+        <div class="tab" onclick="showTab('tab2')">📜 데이터베이스</div>
     </div>
 
     <div id="tab1" class="tab-content active">
@@ -65,7 +60,7 @@
 </div>
 
 <script>
-    // [DBA 영역] 데이터 배열 (여기에 최신 회차를 계속 추가하시면 됩니다)
+    // [DBA 영역] 데이터 배열 (CSV의 내용을 여기에 채워넣으세요)
     const HISTORY = [
     [1, "2002-12-07",  10, 23, 29, 33, 37, 40, 16],  
     [2, "2002-12-14",  9, 13, 21, 25, 32, 42, 2],  
@@ -1324,7 +1319,6 @@
             }
             return [...new Set(pool)].filter(n => n >= 1 && n <= 45).slice(0, 6).sort((a,b)=>a-b);
         }
-        // Fallback random
         let res = [];
         while(res.length < 6) { let n = Math.floor(rand() * 45) + 1; if(!res.includes(n)) res.push(n); }
         return res.sort((a,b)=>a-b);
@@ -1341,16 +1335,22 @@
             let results = [];
             ['M07','M12','M22','T20','T16'].forEach(mId => {
                 for(let s=1; s<=6; s++) {
-                    let hits = 0, prize = 0;
+                    let prizeStats = { 1:0, 2:0, 3:0, 4:0, 5:0 };
+                    let totalPrize = 0;
                     recent.forEach(row => {
                         const actual = row.slice(2, 8);
+                        const bonus = row[8];
                         const pred = runSimulation(mId, s, row[1], birth);
                         const match = pred.filter(n => actual.includes(n)).length;
-                        if(match === 3) { hits++; prize += 5000; }
-                        else if(match === 4) { hits++; prize += 50000; }
-                        else if(match >= 5) { hits++; prize += 1500000; }
+                        
+                        if(match === 6) { prizeStats[1]++; totalPrize += 2000000000; }
+                        else if(match === 5 && pred.includes(bonus)) { prizeStats[2]++; totalPrize += 50000000; }
+                        else if(match === 5) { prizeStats[3]++; totalPrize += 1500000; }
+                        else if(match === 4) { prizeStats[4]++; totalPrize += 50000; }
+                        else if(match === 3) { prizeStats[5]++; totalPrize += 5000; }
                     });
-                    results.push({ id: mId, step: s, roi: (prize/(win*1000))*100, wr: (hits/win)*100 });
+                    const hits = Object.values(prizeStats).reduce((a, b) => a + b, 0);
+                    results.push({ id: mId, step: s, roi: (totalPrize/(win*1000))*100, wr: (hits/win)*100, stats: prizeStats });
                 }
             });
             
@@ -1366,17 +1366,23 @@
         grid.innerHTML = '';
         top5.forEach((m, i) => {
             const pick = runSimulation(m.id, m.step, today, birth);
+            const s = m.stats;
+            const prizeDetail = `1등:${s[1]} | 2등:${s[2]} | 3등:${s[3]}<br>4등:${s[4]} | 5등:${s[5]}`;
+            
             grid.innerHTML += `
                 <div class="result-card">
+                    <div style="font-weight:bold; color:var(--accent)">TOP ${i+1} MODEL</div>
                     <h4>${m.id}_S${m.step}</h4>
-                    <p>ROI: ${Math.round(m.roi)}%</p>
                     <div class="lotto-numbers">${pick.join(', ')}</div>
-                    <p style="font-size:0.8em">최근 승률: ${m.wr.toFixed(1)}%</p>
+                    <p style="margin:5px 0; font-size:0.9em;">ROI: <b>${Math.round(m.roi)}%</b></p>
+                    <div class="prize-badge">
+                        <b>최근 윈도우 적중 내역</b><br>
+                        ${prizeDetail}
+                    </div>
                 </div>`;
         });
     }
 
-    // 히스토리 초기화
     const tbody = document.querySelector('#historyTable tbody');
     HISTORY.forEach(row => {
         tbody.innerHTML += `<tr><td>${row[0]}</td><td>${row[1]}</td><td>${row.slice(2,8).join(', ')}</td><td>${row[8]}</td></tr>`;
