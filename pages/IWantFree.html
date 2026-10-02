@@ -4,9 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>겨리 - 엄마 몰래 자유를 찾아서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-  @import url('https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css');
+  @font-face { font-family: Galmuri9; font-style: normal; font-weight: 400; font-display: swap; src: url('https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/Galmuri9.woff2') format('woff2'); }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0d0a14; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; }
   @supports (height: 100dvh) { body { min-height: 100dvh; } }
@@ -17,7 +20,6 @@
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
   @keyframes cloudMove { 0%{transform:translateX(0)} 100%{transform:translateX(560px)} }
   @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
-  @keyframes glow { 0%,100%{box-shadow:0 0 10px rgba(255,204,0,0.3)} 50%{box-shadow:0 0 25px rgba(255,204,0,0.6)} }
 </style>
 </head>
 <body>
@@ -56,7 +58,7 @@ const PF = "'Press Start 2P','Galmuri9',monospace";
 const C = {
   bg:"#1a1028", bgLight:"#2d1f42", accent:"#ffcc00", danger:"#ff4466",
   safe:"#44ffaa", mom:"#ff6b9d", kid:"#66ccff", white:"#fff", dark:"#0d0a14",
-  fridge:"#a8d8ea", floor:"#3d2e5c", street:"#555566", warm:"#ff9944"
+  fridge:"#a8d8ea", floor:"#3d2e5c", street:"#555566"
 };
 
 // ═══════════════════════════════════════
@@ -86,19 +88,22 @@ const SFX = (() => {
     o.start(); o.stop(c.currentTime + dur);
   };
 
-  // Helper: noise burst
+  // Helper: noise burst (백색소음 버퍼는 한 번만 만들어 재사용)
+  let noiseBuf = null;
   const noise = (c, dur, vol=0.08) => {
     if (muted) return;
-    const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * vol;
+    if (!noiseBuf || noiseBuf.sampleRate !== c.sampleRate) {
+      noiseBuf = c.createBuffer(1, Math.ceil(c.sampleRate * 1.5), c.sampleRate);
+      const data = noiseBuf.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    }
     const src = c.createBufferSource();
     const g = c.createGain();
-    src.buffer = buf;
-    g.gain.setValueAtTime(vol, c.currentTime);
+    src.buffer = noiseBuf;
+    g.gain.setValueAtTime(vol * vol, c.currentTime);
     g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
     src.connect(g); g.connect(c.destination);
-    src.start();
+    src.start(c.currentTime, Math.random() * (1.5 - dur), dur);
   };
 
   return {
@@ -145,11 +150,6 @@ const SFX = (() => {
       tone(c, 500, 0.1, 'sine', 0.12);
       setTimeout(() => tone(c, 700, 0.1, 'sine', 0.12), 100);
       setTimeout(() => tone(c, 1000, 0.2, 'sine', 0.15), 200);
-    }),
-
-    // 👩‍🍳 시야 감지 경고 (FOV 가까울 때)
-    fovWarn: () => play(c => {
-      tone(c, 300, 0.15, 'sawtooth', 0.06);
     }),
 
     // 🧊 냉장고 여는 소리
@@ -557,7 +557,6 @@ function Level3({onClear,onFail}) {
   const [distance,setDistance]=useState(0);
   const maxDist=1500;
   const [playerY,setPlayerY]=useState(300);
-  const [jumping,setJumping]=useState(false);
   const [phoneGauge,setPhoneGauge]=useState(0);
   const [obstacles,setObstacles]=useState([]);
   const speed=3;
@@ -613,7 +612,7 @@ function Level3({onClear,onFail}) {
     const rect=ev.currentTarget.getBoundingClientRect();
     const clickY=(ev.clientY-rect.top)/rect.height;
     if(clickY>0.85){SFX.phoneTap();phoneRef.current=Math.min(phoneRef.current+4,100);setPhoneGauge(phoneRef.current);return;}
-    if(yRef.current>=groundY-5&&!jumpRef.current){SFX.jump();jumpRef.current=true;setJumping(true);}
+    if(yRef.current>=groundY-5&&!jumpRef.current){SFX.jump();jumpRef.current=true;}
   };
 
   const progress=Math.min(distance/maxDist,1);
