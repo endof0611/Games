@@ -6,8 +6,12 @@
 <title>겨리 - 엄마 몰래 자유를 찾아서</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+  @import url('https://cdn.jsdelivr.net/npm/galmuri@2.40.3/dist/galmuri.css');
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #0d0a14; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+  body { background: #0d0a14; display: flex; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; touch-action: manipulation; -webkit-tap-highlight-color: transparent; user-select: none; }
+  @supports (height: 100dvh) { body { min-height: 100dvh; } }
+  .frame { width: min(100%, 480px, calc((100vh - 56px) * 0.8)); margin: 0 auto; }
+  @supports (height: 100dvh) { .frame { width: min(100%, 480px, calc((100dvh - 56px) * 0.8)); } }
   #root { width: 100%; max-width: 480px; margin: 0 auto; }
   @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
@@ -21,11 +25,34 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script>
+(function(){
+// ⏱ 일시정지 가능한 타이머 (이 스크립트 안의 setTimeout/setInterval만 대상)
+const Clock=(()=>{
+  const real={st:window.setTimeout.bind(window),ct:window.clearTimeout.bind(window),si:window.setInterval.bind(window),ci:window.clearInterval.bind(window)};
+  const items=new Map();let nid=1,paused=false;
+  const arm=it=>{
+    if(it.once){it.start=performance.now();it.h=real.st(()=>{items.delete(it.id);it.fn(...it.args);},it.rem);}
+    else it.h=real.si(()=>it.fn(...it.args),it.ms);
+  };
+  const add=once=>(fn,ms=0,...args)=>{const it={id:nid++,once,fn,ms,rem:ms,args};items.set(it.id,it);if(!paused)arm(it);return it.id;};
+  const del=id=>{const it=items.get(id);if(!it)return;(it.once?real.ct:real.ci)(it.h);items.delete(id);};
+  return {
+    setTimeout:add(true),setInterval:add(false),clearTimeout:del,clearInterval:del,
+    pause(){if(paused)return;paused=true;items.forEach(it=>{if(it.once){real.ct(it.h);it.rem=Math.max(0,it.rem-(performance.now()-it.start));}else real.ci(it.h);});},
+    resume(){if(!paused)return;paused=false;items.forEach(arm);}
+  };
+})();
+const {setTimeout,setInterval,clearTimeout,clearInterval}=Clock;
+// 💾 기록 저장 (localStorage 실패해도 게임은 동작)
+const Store={
+  get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(err){return d;}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(err){}}
+};
 const e = React.createElement;
 const {useState, useEffect, useCallback, useRef} = React;
 
 const GAME_W = 480, GAME_H = 600;
-const PF = "'Press Start 2P', monospace";
+const PF = "'Press Start 2P','Galmuri9',monospace";
 const C = {
   bg:"#1a1028", bgLight:"#2d1f42", accent:"#ffcc00", danger:"#ff4466",
   safe:"#44ffaa", mom:"#ff6b9d", kid:"#66ccff", white:"#fff", dark:"#0d0a14",
@@ -37,16 +64,18 @@ const C = {
 // ═══════════════════════════════════════
 const SFX = (() => {
   let ctx = null;
+  let muted = false;
   const getCtx = () => {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
     if (ctx.state === 'suspended') ctx.resume();
     return ctx;
   };
 
-  const play = (fn) => { try { fn(getCtx()); } catch(e){} };
+  const play = (fn) => { if (muted) return; try { fn(getCtx()); } catch(e){} };
 
   // Helper: simple tone
   const tone = (c, freq, dur, type='square', vol=0.12) => {
+    if (muted) return;
     const o = c.createOscillator();
     const g = c.createGain();
     o.type = type;
@@ -59,6 +88,7 @@ const SFX = (() => {
 
   // Helper: noise burst
   const noise = (c, dur, vol=0.08) => {
+    if (muted) return;
     const buf = c.createBuffer(1, c.sampleRate * dur, c.sampleRate);
     const data = buf.getChannelData(0);
     for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * vol;
@@ -72,6 +102,7 @@ const SFX = (() => {
   };
 
   return {
+    setMuted: (m) => { muted = m; },
     // 🛏️ 코골이
     snore: () => play(c => {
       const o = c.createOscillator(); const g = c.createGain();
@@ -205,7 +236,7 @@ const SFX = (() => {
 })();
 
 // ─── TITLE ───
-function TitleScreen({onStart}) {
+function TitleScreen({onStart,stats}) {
   const [blink, setBlink] = useState(true);
   useEffect(() => { const i=setInterval(()=>setBlink(b=>!b),600); return ()=>clearInterval(i); }, []);
 
@@ -221,7 +252,8 @@ function TitleScreen({onStart}) {
       e('span',{style:{animation:'float 2s ease-in-out infinite 0.6s'}},'🛹'),
       e('span',{style:{animation:'float 2s ease-in-out infinite 0.9s'}},'📖'),
     ),
-    e('button',{onClick:()=>{SFX.click();onStart();},style:{marginTop:28,fontFamily:PF,fontSize:11,padding:'14px 36px',background:blink?`linear-gradient(135deg,${C.accent},#ff9900)`:`linear-gradient(135deg,#ff9900,${C.accent})`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'4px 4px 0 #000',transition:'all 0.15s',transform:blink?'scale(1)':'scale(1.05)'}},'게임 시작!'),
+    stats&&(stats.fails+stats.best+stats.clears>0)?e('div',{style:{fontFamily:PF,fontSize:7,color:C.safe,marginTop:16,lineHeight:2,textAlign:'center'}},`🏅 최고 LEVEL ${stats.best} · 😱 들킨 횟수 ${stats.fails} · 🏆 올클리어 ${stats.clears}`):null,
+    e('button',{onClick:()=>{SFX.click();onStart();},style:{marginTop:stats&&(stats.fails+stats.best+stats.clears>0)?14:28,fontFamily:PF,fontSize:11,padding:'14px 36px',background:blink?`linear-gradient(135deg,${C.accent},#ff9900)`:`linear-gradient(135deg,#ff9900,${C.accent})`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'4px 4px 0 #000',transition:'all 0.15s',transform:blink?'scale(1)':'scale(1.05)'}},'게임 시작!'),
     e('div',{style:{fontFamily:PF,fontSize:7,color:'rgba(255,255,255,0.35)',marginTop:16}},'TAP / CLICK to play')
   );
 }
@@ -239,22 +271,22 @@ function LevelIntro({level,title,desc,emoji,onStart}) {
 
 // ─── LEVEL CLEAR ───
 function LevelClear({level,onNext}) {
-  const msgs=["겨리 스마트폰 획득! 🎉","겨리 아이스크림 GET! 🍦","겨리 무사히 탈출! 🏃","겨리 완벽한 알리바이! 😎"];
+  const msgs=["겨리 스마트폰 획득! 🎉","겨리 아이스크림 GET! 🍦","겨리 무사히 탈출! 🏃","겨리 완벽한 알리바이! 😎","겨리 야식 라면 완성! 🍜"];
   return e('div',{style:{width:'100%',height:'100%',background:`radial-gradient(circle at 50% 40%,#1a3a2a,${C.bg})`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}},
     e('div',{style:{fontSize:60,animation:'float 1s ease-in-out infinite'}},'⭐'),
     e('div',{style:{fontFamily:PF,fontSize:13,color:C.safe,textShadow:'2px 2px 0 #000'}},'STAGE CLEAR!'),
     e('div',{style:{fontFamily:PF,fontSize:9,color:C.accent,textShadow:'1px 1px 0 #000'}},msgs[level-1]),
-    e('button',{onClick:()=>{SFX.click();onNext();},style:{marginTop:20,fontFamily:PF,fontSize:10,padding:'12px 32px',background:`linear-gradient(135deg,${C.accent},#ff9900)`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'3px 3px 0 #000'}},level<4?'다음 스테이지 →':'엔딩 보기')
+    e('button',{onClick:()=>{SFX.click();onNext();},style:{marginTop:20,fontFamily:PF,fontSize:10,padding:'12px 32px',background:`linear-gradient(135deg,${C.accent},#ff9900)`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'3px 3px 0 #000'}},level<5?'다음 스테이지 →':'엔딩 보기')
   );
 }
 
 // ─── GAME OVER ───
-function GameOver({reason,onRetry}) {
+function GameOver({reason,quote,onRetry}) {
   return e('div',{style:{width:'100%',height:'100%',background:`radial-gradient(circle at 50% 40%,#3a1a1a,${C.bg})`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14}},
     e('div',{style:{fontSize:56}},'😱'),
     e('div',{style:{fontFamily:PF,fontSize:14,color:C.danger,textShadow:'2px 2px 0 #000'}},'들켰다!'),
     e('div',{style:{fontFamily:PF,fontSize:8,color:'rgba(255,255,255,0.6)',textAlign:'center',lineHeight:2,maxWidth:320,padding:'0 20px',whiteSpace:'pre-line'}},reason),
-    e('div',{style:{fontFamily:PF,fontSize:8,color:C.mom,marginTop:4,textShadow:'1px 1px 0 #000',textAlign:'center',lineHeight:2.2}},'엄마: "겨리 너 이리 와봐!!!"'),
+    e('div',{style:{fontFamily:PF,fontSize:8,color:C.mom,marginTop:4,textShadow:'1px 1px 0 #000',textAlign:'center',lineHeight:2.2}},quote||'엄마: "겨리 너 이리 와봐!!!"'),
     e('button',{onClick:()=>{SFX.click();onRetry();},style:{marginTop:18,fontFamily:PF,fontSize:10,padding:'12px 32px',background:`linear-gradient(135deg,${C.danger},#cc2244)`,color:C.white,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'3px 3px 0 #000'}},'다시 도전!')
   );
 }
@@ -273,6 +305,7 @@ function Level1({onClear,onFail}) {
   const [kakaoTimer,setKakaoTimer]=useState(100);
   const [moving,setMoving]=useState(false);
   const caught=useRef(false);
+  const xRef=useRef(60),gaugeRef=useRef(0),kakaoRef=useRef(100),doneRef=useRef(false);
 
   useEffect(()=>{
     if(phase!=="sneak")return;
@@ -304,11 +337,13 @@ function Level1({onClear,onFail}) {
     if(phase==="sneak"&&snoring){
       SFX.sneak();
       setMoving(true);
-      setPlayerX(x=>{const nx=Math.min(x+14,phoneX);if(nx>=phoneX)setPhase("kakao");return nx;});
+      const nx=Math.min(xRef.current+14,phoneX);xRef.current=nx;setPlayerX(nx);
+      if(nx>=phoneX)setPhase("kakao");
       setTimeout(()=>setMoving(false),150);
     } else if(phase==="mute"){
       SFX.muteTap();
-      setMuteGauge(g=>{const ng=Math.min(g+8,100);if(ng>=100){SFX.muteSuccess();setTimeout(()=>onClear(),300);}return ng;});
+      const ng=Math.min(gaugeRef.current+8,100);gaugeRef.current=ng;setMuteGauge(ng);
+      if(ng>=100&&!doneRef.current){doneRef.current=true;SFX.muteSuccess();setTimeout(()=>onClear(),300);}
     }
   },[phase,snoring,onClear]);
 
@@ -322,7 +357,9 @@ function Level1({onClear,onFail}) {
   useEffect(()=>{
     if(phase!=="mute")return;
     const i=setInterval(()=>{
-      setKakaoTimer(t=>{if(t<=0){onFail("\"카톡!\" 알림을 못 끄고 엄마가 깨버렸다!\n더 빨리 무음 버튼을 눌러야 해!");return 0;}return t-2;});
+      if(doneRef.current)return;
+      const nt=kakaoRef.current-2;kakaoRef.current=nt;setKakaoTimer(Math.max(nt,0));
+      if(nt<=0){doneRef.current=true;onFail("\"카톡!\" 알림을 못 끄고 엄마가 깨버렸다!\n더 빨리 무음 버튼을 눌러야 해!");}
     },50);
     return ()=>clearInterval(i);
   },[phase,onFail]);
@@ -390,6 +427,9 @@ function Level2({onClear,onFail}) {
   const [fridgeProgress,setFridgeProgress]=useState(0);
   const [noiseGauge,setNoiseGauge]=useState(0);
   const [pressing,setPressing]=useState(false);
+  const [away,setAway]=useState(false);
+  const awayRef=useRef(false);
+  const noiseRef=useRef(0);
   const momPos={x:300,y:300};
   const fridgePos={x:380,y:120};
   const caught=useRef(false);
@@ -398,19 +438,28 @@ function Level2({onClear,onFail}) {
 
   useEffect(()=>{
     if(phase!=="sneak"&&phase!=="fridge")return;
-    const i=setInterval(()=>setMomAngle(a=>(a+1.2)%360),30);
+    const i=setInterval(()=>{if(!awayRef.current)setMomAngle(a=>(a+1.2)%360);},30);
     return ()=>clearInterval(i);
   },[phase]);
 
+  // 엄마가 가끔 설거지하느라 등을 돌린다 (그때가 기회!)
   useEffect(()=>{
-    if(caught.current||(phase!=="sneak"&&phase!=="fridge"))return;
+    let t;
+    const watch=()=>{awayRef.current=false;setAway(false);t=setTimeout(rest,3500+Math.random()*2000);};
+    const rest=()=>{awayRef.current=true;setAway(true);t=setTimeout(watch,2200+Math.random()*1000);};
+    t=setTimeout(rest,3000+Math.random()*1500);
+    return ()=>clearTimeout(t);
+  },[]);
+
+  useEffect(()=>{
+    if(caught.current||away||(phase!=="sneak"&&phase!=="fridge"))return;
     const dx=playerPos.x-momPos.x,dy=playerPos.y-momPos.y;
     const dist=Math.sqrt(dx*dx+dy*dy);
     const angle=((Math.atan2(dy,dx)*180/Math.PI)+360)%360;
     const diff=Math.abs(angle-momAngle);
     const angleDiff=Math.min(diff,360-diff);
     if(dist<250&&angleDiff<35){caught.current=true;SFX.crash();onFail("엄마 시야에 딱 걸렸다!\n부채꼴 시야를 잘 피해서 이동해야 해!");}
-  },[playerPos,momAngle,phase]);
+  },[playerPos,momAngle,phase,away]);
 
   const movePlayer=useCallback((ev)=>{
     if(phase==="fridge")return;
@@ -437,8 +486,9 @@ function Level2({onClear,onFail}) {
         fridgeRef.current=Math.min(fridgeRef.current+0.9,100);
         setFridgeProgress(fridgeRef.current);
         if(Math.random()<0.05)SFX.fridgeCreak();
-        setNoiseGauge(n=>{const nn=Math.min(n+0.25,100);if(nn>=100&&!caught.current){caught.current=true;onFail("냉장고를 너무 세게 열어서 소리가 났다!\n더 천천히 열어야 해!");}return nn;});
-      } else {setNoiseGauge(n=>Math.max(0,n-0.5));}
+        noiseRef.current=Math.min(noiseRef.current+1.2,100);setNoiseGauge(noiseRef.current);
+        if(noiseRef.current>=100&&!caught.current){caught.current=true;onFail("냉장고를 너무 세게 열어서 소리가 났다!\n소음이 높아지면 손을 떼고 쉬었다가 열어야 해!");}
+      } else {noiseRef.current=Math.max(0,noiseRef.current-0.6);setNoiseGauge(noiseRef.current);}
       if(fridgeRef.current>=100){clearInterval(i);setTimeout(()=>onClear(),400);}
     },30);
     return ()=>clearInterval(i);
@@ -446,6 +496,10 @@ function Level2({onClear,onFail}) {
 
   const handleDown=()=>{pressingRef.current=true;setPressing(true);};
   const handleUp=()=>{pressingRef.current=false;setPressing(false);};
+  useEffect(()=>{
+    window.addEventListener('mouseup',handleUp);window.addEventListener('touchend',handleUp);
+    return ()=>{window.removeEventListener('mouseup',handleUp);window.removeEventListener('touchend',handleUp);};
+  },[]);
 
   const fovLen=250,fovHalf=35;
   const rad1=(momAngle-fovHalf)*Math.PI/180;
@@ -474,11 +528,11 @@ function Level2({onClear,onFail}) {
     // FOV SVG
     e('svg',{style:{position:'absolute',inset:0,zIndex:5,pointerEvents:'none'},width:'100%',height:'100%',viewBox:`0 0 ${GAME_W} ${GAME_H}`},
       e('defs',null,e('radialGradient',{id:'fovGrad'},e('stop',{offset:'0%',stopColor:C.danger,stopOpacity:'0.35'}),e('stop',{offset:'100%',stopColor:C.danger,stopOpacity:'0.02'}))),
-      e('path',{d:`M ${momPos.x} ${momPos.y} L ${momPos.x+Math.cos(rad1)*fovLen} ${momPos.y+Math.sin(rad1)*fovLen} A ${fovLen} ${fovLen} 0 0 1 ${momPos.x+Math.cos(rad2)*fovLen} ${momPos.y+Math.sin(rad2)*fovLen} Z`,fill:'url(#fovGrad)',stroke:C.danger,strokeWidth:'1',strokeOpacity:'0.3'})
+      away?null:e('path',{d:`M ${momPos.x} ${momPos.y} L ${momPos.x+Math.cos(rad1)*fovLen} ${momPos.y+Math.sin(rad1)*fovLen} A ${fovLen} ${fovLen} 0 0 1 ${momPos.x+Math.cos(rad2)*fovLen} ${momPos.y+Math.sin(rad2)*fovLen} Z`,fill:'url(#fovGrad)',stroke:C.danger,strokeWidth:'1',strokeOpacity:'0.3'})
     ),
     // Mom
     e('div',{style:{position:'absolute',left:momPos.x-22,top:momPos.y-22,zIndex:10,display:'flex',flexDirection:'column',alignItems:'center'}},
-      e('span',{style:{fontSize:36}},'👩‍🍳'),e('span',{style:{fontFamily:PF,fontSize:6,color:C.mom,marginTop:2}},'엄마')
+      e('span',{style:{fontSize:36}},'👩‍🍳'),e('span',{style:{fontFamily:PF,fontSize:6,color:away?C.safe:C.mom,marginTop:2}},away?'설거지 중~':'엄마')
     ),
     // Player
     e('div',{style:{position:'absolute',left:playerPos.x-18,top:playerPos.y-18,zIndex:10,transition:'left 0.15s, top 0.15s'}},
@@ -486,13 +540,13 @@ function Level2({onClear,onFail}) {
     ),
     // Noise gauge
     phase==="fridge"?e('div',{style:{position:'absolute',bottom:50,left:'50%',transform:'translateX(-50%)',display:'flex',flexDirection:'column',alignItems:'center',gap:8,zIndex:25}},
-      e('div',{style:{fontFamily:PF,fontSize:8,color:pressing?C.accent:C.white,animation:pressing?'pulse 0.3s infinite':'none'}},pressing?'끼이이익...':'꾹 눌러서 냉장고 열기!'),
+      e('div',{style:{fontFamily:PF,fontSize:8,color:pressing?C.accent:C.white,animation:pressing?'pulse 0.3s infinite':'none'}},pressing?'끼이이익...':'꾹 눌러서 냉장고 열기! (소음 높으면 손 떼기)'),
       e('div',{style:{fontFamily:PF,fontSize:7,color:noiseGauge>60?C.danger:C.accent}},`🔊 소음: ${Math.round(noiseGauge)}%`),
       e('div',{style:{width:180,height:12,background:'#222',border:'2px solid #555',borderRadius:3,overflow:'hidden'}},
         e('div',{style:{width:`${noiseGauge}%`,height:'100%',background:noiseGauge>70?C.danger:noiseGauge>40?C.accent:C.safe,transition:'width 0.1s, background 0.3s'}})
       )
     ):null,
-    phase==="sneak"?e('div',{style:{position:'absolute',bottom:25,left:'50%',transform:'translateX(-50%)',fontFamily:PF,fontSize:7,color:'rgba(255,255,255,0.5)',textAlign:'center',zIndex:15}},'탭해서 이동! 빨간 시야를 피해 냉장고로!'):null
+    phase==="sneak"?e('div',{style:{position:'absolute',bottom:25,left:'50%',transform:'translateX(-50%)',fontFamily:PF,fontSize:7,color:'rgba(255,255,255,0.5)',textAlign:'center',zIndex:15}},away?'🍳 엄마가 설거지 중! 지금이 기회!':'탭해서 이동! 빨간 시야를 피해 냉장고로!'):null
   );
 }
 
@@ -512,6 +566,7 @@ function Level3({onClear,onFail}) {
   const groundY=300;
   const distRef=useRef(0);
   const phoneRef=useRef(0);
+  const yRef=useRef(300);
   const needPhone=50;
 
   useEffect(()=>{
@@ -534,8 +589,11 @@ function Level3({onClear,onFail}) {
         }
         return nw;
       });
-      if(jumpRef.current){setPlayerY(y=>{const ny=y-6;if(ny<=200){jumpRef.current=false;}return ny;});}
-      else{setPlayerY(y=>{if(y<groundY)return Math.min(y+5,groundY);return groundY;});setJumping(false);}
+      if(jumpRef.current){yRef.current-=6;if(yRef.current<=200)jumpRef.current=false;}
+      else if(yRef.current<groundY){yRef.current=Math.min(yRef.current+5,groundY);}
+      setPlayerY(yRef.current);
+      // 폰 게이지는 가만히 있으면 줄어든다
+      phoneRef.current=Math.max(0,phoneRef.current-0.04);setPhoneGauge(phoneRef.current);
     },16);
     return ()=>clearInterval(i);
   },[onClear,onFail]);
@@ -555,7 +613,7 @@ function Level3({onClear,onFail}) {
     const rect=ev.currentTarget.getBoundingClientRect();
     const clickY=(ev.clientY-rect.top)/rect.height;
     if(clickY>0.85){SFX.phoneTap();phoneRef.current=Math.min(phoneRef.current+4,100);setPhoneGauge(phoneRef.current);return;}
-    if(playerY>=groundY-5&&!jumpRef.current){SFX.jump();jumpRef.current=true;setJumping(true);}
+    if(yRef.current>=groundY-5&&!jumpRef.current){SFX.jump();jumpRef.current=true;setJumping(true);}
   };
 
   const progress=Math.min(distance/maxDist,1);
@@ -611,6 +669,7 @@ function Level4({onClear,onFail}) {
   const [momClose,setMomClose]=useState(false);
   const [showComic,setShowComic]=useState(true);
   const caught=useRef(false);
+  const hideRef=useRef(0),eyeRef=useRef(0);
   const targetRounds=3;
 
   useEffect(()=>{
@@ -636,24 +695,26 @@ function Level4({onClear,onFail}) {
   const handleTap=useCallback(()=>{
     if(phase==="alert"){
       SFX.hideTap();
-      setHideProgress(h=>{const nh=Math.min(h+12,100);if(nh>=100){setPhase("inspect");setShowComic(false);}return nh;});
+      const nh=Math.min(hideRef.current+12,100);hideRef.current=nh;setHideProgress(nh);
+      if(nh>=100){setPhase("inspect");setShowComic(false);}
     } else if(phase==="inspect"){
       SFX.eyeShake();
-      setEyeShake(es=>{const ne=Math.min(es+15,100);if(ne>=100&&!caught.current){caught.current=true;onFail("눈동자가 너무 흔들려서 들켰다!\n검사 중에는 가만히 있어야 해!");}return ne;});
+      const ne=Math.min(eyeRef.current+15,100);eyeRef.current=ne;setEyeShake(ne);
+      if(ne>=100&&!caught.current){caught.current=true;onFail("눈동자가 너무 흔들려서 들켰다!\n검사 중에는 가만히 있어야 해!");}
     }
   },[phase,onFail]);
 
   useEffect(()=>{
     if(phase!=="inspect")return;
-    setEyeShake(0);let timer=0;
+    eyeRef.current=0;setEyeShake(0);let timer=0;
     const i=setInterval(()=>{
       timer+=1;setInspectTimer(timer);
-      setEyeShake(es=>Math.max(0,es-0.3));
+      eyeRef.current=Math.max(0,eyeRef.current-0.3);setEyeShake(eyeRef.current);
       if(timer>=100){
         clearInterval(i);
         const nr=roundsCleared+1;setRoundsCleared(nr);
         if(nr>=targetRounds){onClear();}
-        else{setHideProgress(0);setFootstepVol(0);setInspectTimer(0);setPhase("chill");}
+        else{hideRef.current=0;setHideProgress(0);setFootstepVol(0);setInspectTimer(0);setPhase("chill");}
       }
     },40);
     return ()=>clearInterval(i);
@@ -725,8 +786,94 @@ function Level4({onClear,onFail}) {
   );
 }
 
+// ═══════════════════════════════════════
+// LEVEL 5: 부엌 - 한밤의 라면 작전
+// ═══════════════════════════════════════
+function Level5({onClear,onFail}) {
+  const steps=[{emoji:"💧",label:"물 붓기"},{emoji:"🍜",label:"면 넣기"},{emoji:"🧂",label:"스프 뿌리기"},{emoji:"🥚",label:"계란 톡!"}];
+  const widths=[34,28,22,18];
+  const zonesRef=useRef(widths.map(w=>({w,s:10+Math.random()*(80-w)})));
+  const [step,setStep]=useState(0);
+  const [pos,setPos]=useState(0);
+  const [sleep,setSleep]=useState(100);
+  const [flash,setFlash]=useState("");
+  const stepRef=useRef(0),posRef=useRef(0),dirRef=useRef(1),sleepRef=useRef(100),done=useRef(false);
+
+  useEffect(()=>{
+    const i=setInterval(()=>{
+      if(done.current)return;
+      const speed=1.4+stepRef.current*0.5;
+      let np=posRef.current+dirRef.current*speed;
+      if(np>=100){np=100;dirRef.current=-1;}
+      if(np<=0){np=0;dirRef.current=1;}
+      posRef.current=np;setPos(np);
+    },16);
+    return ()=>clearInterval(i);
+  },[]);
+
+  useEffect(()=>{
+    if(!flash)return;
+    const t=setTimeout(()=>setFlash(""),500);
+    return ()=>clearTimeout(t);
+  },[flash]);
+
+  const handleTap=()=>{
+    if(done.current)return;
+    const z=zonesRef.current[stepRef.current];
+    if(posRef.current>=z.s&&posRef.current<=z.s+z.w){
+      SFX.phoneTap();
+      stepRef.current+=1;setStep(stepRef.current);setFlash("good");
+      if(stepRef.current>=steps.length){done.current=true;SFX.muteSuccess();setTimeout(()=>onClear(),600);}
+    } else {
+      SFX.alert();
+      sleepRef.current=Math.max(0,sleepRef.current-34);setSleep(sleepRef.current);setFlash("bad");
+      if(sleepRef.current<=0){done.current=true;onFail("부글부글 소리와 라면 냄새에 엄마가 깼다!\n초록 구간에서 정확히 탭해야 해!");}
+    }
+  };
+
+  const cur=steps[Math.min(step,steps.length-1)];
+  const z=zonesRef.current[Math.min(step,steps.length-1)];
+  const awake=sleep<=66;
+
+  return e('div',{style:{width:'100%',height:'100%',background:'linear-gradient(180deg,#14102a 0%,#241a40 55%,#33274f 100%)',position:'relative',overflow:'hidden',cursor:'pointer',userSelect:'none',animation:flash==="bad"?'shake 0.2s':'none'},onClick:handleTap},
+    e('div',{style:{position:'absolute',top:8,left:10,right:10,fontFamily:PF,fontSize:8,color:C.accent,zIndex:15,display:'flex',justifyContent:'space-between'}},
+      e('span',null,'LEVEL 5: 새벽 부엌'),e('span',null,'🍜 한밤의 라면 작전')
+    ),
+    // 엄마 방문
+    e('div',{style:{position:'absolute',right:18,top:44,width:70,height:96,background:'linear-gradient(180deg,#6a5a3a,#5a4a2a)',borderRadius:4,border:'2px solid #4a3a2a',display:'flex',alignItems:'center',justifyContent:'center',flexDirection:'column'}},
+      e('span',{style:{fontSize:30}},awake?'😳':'😴'),
+      e('span',{style:{fontFamily:PF,fontSize:6,color:awake?C.danger:C.safe,marginTop:4}},awake?'뒤척뒤척!':'쿨쿨~')
+    ),
+    // 엄마 숙면도
+    e('div',{style:{position:'absolute',left:16,top:50,display:'flex',flexDirection:'column',gap:6,zIndex:15}},
+      e('div',{style:{fontFamily:PF,fontSize:7,color:sleep>66?C.safe:sleep>33?C.accent:C.danger}},`😴 엄마 숙면도 ${sleep}%`),
+      e('div',{style:{width:150,height:10,background:'#222',border:'2px solid #555',borderRadius:3,overflow:'hidden'}},
+        e('div',{style:{width:`${sleep}%`,height:'100%',background:sleep>66?C.safe:sleep>33?C.accent:C.danger,transition:'width 0.2s'}})
+      )
+    ),
+    // 냄비
+    e('div',{style:{position:'absolute',top:170,left:'50%',transform:'translateX(-50%)',textAlign:'center'}},
+      e('div',{style:{fontSize:20,animation:'float 1.2s ease-in-out infinite',opacity:0.5}},'♨️'),
+      e('div',{style:{fontSize:76,filter:flash==="good"?'drop-shadow(0 0 14px #44ffaa)':flash==="bad"?'drop-shadow(0 0 14px #ff4466)':'none'}},'🍲'),
+      e('div',{style:{fontFamily:PF,fontSize:9,color:flash==="good"?C.safe:flash==="bad"?C.danger:C.white,height:14,marginTop:4}},flash==="good"?'굿! ✨':flash==="bad"?'앗, 소리!! 💥':'')
+    ),
+    // 진행 아이콘
+    e('div',{style:{position:'absolute',top:330,left:0,right:0,display:'flex',justifyContent:'center',gap:14}},
+      ...steps.map((st,i)=>e('div',{key:i,style:{fontSize:28,opacity:i<step?1:i===step?0.9:0.25,transform:i===step?'scale(1.2)':'none',filter:i<step?'none':'grayscale(0.7)'}},i<step?'✅':st.emoji))
+    ),
+    // 지시문
+    e('div',{style:{position:'absolute',top:385,left:0,right:0,textAlign:'center',fontFamily:PF,fontSize:9,color:C.accent}},step<steps.length?`${cur.emoji} ${cur.label}`:'🍜 라면 완성!'),
+    // 타이밍 바
+    e('div',{style:{position:'absolute',top:425,left:40,right:40,height:30,background:'#1a1a2a',border:'3px solid #555',borderRadius:6,overflow:'hidden'}},
+      e('div',{'data-zone-s':z.s,'data-zone-w':z.w,style:{position:'absolute',left:`${z.s}%`,width:`${z.w}%`,top:0,bottom:0,background:'rgba(68,255,170,0.55)',borderLeft:'2px solid #44ffaa',borderRight:'2px solid #44ffaa'}}),
+      e('div',{'data-pos':Math.round(pos),style:{position:'absolute',left:`calc(${pos}% - 3px)`,top:0,bottom:0,width:6,background:'#fff',boxShadow:'0 0 8px #fff'}})
+    ),
+    e('div',{style:{position:'absolute',bottom:24,left:'50%',transform:'translateX(-50%)',fontFamily:PF,fontSize:7,color:'rgba(255,255,255,0.5)',textAlign:'center',lineHeight:2,whiteSpace:'nowrap'}},'흰 선이 초록 구간에 있을 때 탭! (실수 3번이면 엄마 기상)')
+  );
+}
+
 // ─── ENDING ───
-function Ending({onRestart}) {
+function Ending({onRestart,fails}) {
   return e('div',{style:{width:'100%',height:'100%',background:`radial-gradient(ellipse at 50% 30%,#2a2050,${C.bg})`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,padding:30}},
     e('div',{style:{fontSize:64,animation:'float 2s ease-in-out infinite'}},'🏆'),
     e('div',{style:{fontFamily:PF,fontSize:15,color:C.accent,textShadow:'2px 2px 0 #000, 0 0 20px rgba(255,204,0,0.4)'}},'GAME CLEAR!'),
@@ -734,50 +881,105 @@ function Ending({onRestart}) {
       '겨리가 엄마의 잔소리를 뚫고',e('br'),'자유를 쟁취했다!',e('br'),
       e('span',{style:{color:C.mom}},'...내일도 잔소리는 계속된다 😅')
     ),
-    e('div',{style:{display:'flex',gap:12,marginTop:12,fontSize:28}},...['📱','🍦','🛹','📖','⭐'].map((s,i)=>e('span',{key:i},s))),
-    e('button',{onClick:()=>{SFX.click();onRestart();},style:{marginTop:24,fontFamily:PF,fontSize:10,padding:'12px 32px',background:`linear-gradient(135deg,${C.accent},#ff9900)`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'3px 3px 0 #000'}},'처음부터 다시!')
+    e('div',{style:{display:'flex',gap:12,marginTop:12,fontSize:28}},...['📱','🍦','🛹','📖','🍜','⭐'].map((s,i)=>e('span',{key:i},s))),
+    e('div',{style:{fontFamily:PF,fontSize:7,color:'rgba(255,255,255,0.6)',marginTop:12}},fails>0?`이번 판에 들킨 횟수: ${fails}번 😱`:'한 번도 안 들켰다! 🥷 완벽!'),
+    e('button',{onClick:()=>{SFX.click();onRestart();},style:{marginTop:16,fontFamily:PF,fontSize:10,padding:'12px 32px',background:`linear-gradient(135deg,${C.accent},#ff9900)`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'3px 3px 0 #000'}},'처음부터 다시!')
   );
 }
 
 // ─── MAIN ───
+const LAST_LEVEL=5;
 const levelData=[
   {title:"스마트폰 서리 작전",desc:"엄마가 코 골 때만 움직여!\n폰을 집으면 카톡 알림이... 무음 버튼 연타!",emoji:"📱"},
-  {title:"아이스크림 닌자",desc:"엄마의 부채꼴 시야를 피해 냉장고로!\n문은 천천히 열어야 소리가 안 나!",emoji:"🍦"},
-  {title:"스몸비 챌린지",desc:"위쪽 탭 = 장애물 점프!\n아래쪽 폰 탭 = 게임 진행! (도착 전 50% 채우기)\n아줌마를 조심해!",emoji:"🛹"},
+  {title:"아이스크림 닌자",desc:"엄마의 부채꼴 시야를 피해 냉장고로!\n엄마가 설거지할 때가 기회!\n소음이 높으면 손을 떼고 쉬었다 열어!",emoji:"🍦"},
+  {title:"스몸비 챌린지",desc:"위쪽 탭 = 장애물 점프!\n아래쪽 폰 탭 = 게임 진행!\n게이지는 계속 줄어들어, 도착 전 50% 이상!\n아줌마를 조심해!",emoji:"🛹"},
   {title:"완벽한 알리바이",desc:"발소리가 들리면 탭해서 폰 숨기기!\n엄마 검사 중엔 절대 터치 금지!\n3라운드 버티면 성공!",emoji:"📚"},
+  {title:"한밤의 라면 작전",desc:"엄마 잠든 새벽, 몰래 라면 끓이기!\n흰 선이 초록 구간에 올 때 탭!\n실수 3번이면 엄마가 깬다!",emoji:"🍜"},
 ];
-const Levels=[Level1,Level2,Level3,Level4];
+const momLines=[
+  ['엄마: "겨리 너 지금 폰 만졌니?!"','엄마: "한밤중에 뭐 하는 거야!"','엄마: "그 폰 이리 내놔!"'],
+  ['엄마: "냉장고 앞에서 뭐 하니? 밥 먹었잖아!"','엄마: "아이스크림은 내일 먹어!"','엄마: "겨리 너 거기 서!"'],
+  ['엄마: "걸으면서 폰 보지 말랬지!!"','엄마: "겨리 너 이리 와봐!!!"','엄마: "앞을 보고 걸어야지!"'],
+  ['엄마: "공부한다더니 이게 뭐니?!"','엄마: "겨리 너 숙제는 했니?!"','엄마: "폰 이리 내!"'],
+  ['엄마: "이 밤에 웬 라면 냄새야?!"','엄마: "겨리 너 야식 먹니?!"','엄마: "엄마도 한 입만... 아니 안 돼!"'],
+];
+const Levels=[Level1,Level2,Level3,Level4,Level5];
 
 function Game() {
   const [screen,setScreen]=useState("title");
   const [level,setLevel]=useState(1);
   const [failReason,setFailReason]=useState("");
+  const [failQuote,setFailQuote]=useState("");
   const [key,setKey]=useState(0);
+  const [paused,setPaused]=useState(false);
+  const [muted,setMuted]=useState(()=>Store.get('iwf_muted',false));
+  const [stats,setStats]=useState(()=>Store.get('iwf_stats',{best:0,fails:0,clears:0}));
+  const [runFails,setRunFails]=useState(0);
   const playing=useRef(false);
+  const levelRef=useRef(1);
+  const statsRef=useRef(stats);
+  levelRef.current=level;
 
-  const startGame=()=>{setLevel(1);setScreen("intro");};
+  const saveStats=(fn)=>{const ns=fn(statsRef.current);statsRef.current=ns;setStats(ns);Store.set('iwf_stats',ns);};
+
+  useEffect(()=>{SFX.setMuted(muted);Store.set('iwf_muted',muted);},[muted]);
+  useEffect(()=>{if(paused)Clock.pause();else Clock.resume();},[paused]);
+  useEffect(()=>{if(screen!=="play")setPaused(false);},[screen]);
+  useEffect(()=>{
+    const onHide=()=>{if(document.hidden&&playing.current)setPaused(true);};
+    document.addEventListener('visibilitychange',onHide);
+    return ()=>document.removeEventListener('visibilitychange',onHide);
+  },[]);
+
+  const startGame=()=>{setLevel(1);setRunFails(0);setScreen("intro");};
   const startLevel=()=>{setKey(k=>k+1);playing.current=true;setScreen("play");};
   // 클리어/실패는 한 판에 한 번만 처리 (중복 호출·경합 방지)
-  const onClear=useCallback(()=>{if(!playing.current)return;playing.current=false;SFX.stageClear();setScreen("clear");},[]);
-  const onFail=useCallback((reason)=>{if(!playing.current)return;playing.current=false;SFX.gameOver();setFailReason(reason);setScreen("fail");},[]);
-  const nextLevel=()=>{if(level>=4){SFX.fanfare();setScreen("ending");}else{setLevel(l=>l+1);setScreen("intro");}};
+  const onClear=useCallback(()=>{
+    if(!playing.current)return;playing.current=false;
+    SFX.stageClear();saveStats(s=>({...s,best:Math.max(s.best,levelRef.current)}));setScreen("clear");
+  },[]);
+  const onFail=useCallback((reason)=>{
+    if(!playing.current)return;playing.current=false;
+    const lines=momLines[levelRef.current-1];
+    SFX.gameOver();setFailReason(reason);setFailQuote(lines[Math.floor(Math.random()*lines.length)]);
+    setRunFails(f=>f+1);saveStats(s=>({...s,fails:s.fails+1}));setScreen("fail");
+  },[]);
+  const nextLevel=()=>{
+    if(level>=LAST_LEVEL){SFX.fanfare();saveStats(s=>({...s,clears:s.clears+1}));setScreen("ending");}
+    else{setLevel(l=>l+1);setScreen("intro");}
+  };
   const retry=()=>setScreen("intro");
+  const goTitle=()=>{playing.current=false;setPaused(false);setScreen("title");};
 
   const LevelComp=Levels[level-1];
+  const btn=(label,onClick)=>e('button',{onClick,style:{fontFamily:PF,fontSize:8,padding:'8px 10px',background:C.bgLight,color:C.white,border:'2px solid #000',borderRadius:5,cursor:'pointer',boxShadow:'2px 2px 0 #000'}},label);
 
-  return e('div',{style:{width:`min(100%, ${GAME_W}px, 80vh)`,margin:'0 auto',aspectRatio:`${GAME_W}/${GAME_H}`,position:'relative',overflow:'hidden',borderRadius:12,boxShadow:'0 8px 40px rgba(0,0,0,0.5), 0 0 0 3px rgba(255,255,255,0.1)',fontFamily:'sans-serif'}},
-    e('div',{style:{width:'100%',height:'100%',position:'absolute',inset:0}},
-      screen==="title"?e(TitleScreen,{onStart:startGame}):null,
-      screen==="intro"?e(LevelIntro,{level,title:levelData[level-1].title,desc:levelData[level-1].desc,emoji:levelData[level-1].emoji,onStart:startLevel}):null,
-      screen==="play"?e(LevelComp,{key:key,onClear,onFail}):null,
-      screen==="clear"?e(LevelClear,{level,onNext:nextLevel}):null,
-      screen==="fail"?e(GameOver,{reason:failReason,onRetry:retry}):null,
-      screen==="ending"?e(Ending,{onRestart:startGame}):null
+  return e('div',{className:'frame'},
+    e('div',{style:{width:'100%',aspectRatio:`${GAME_W}/${GAME_H}`,position:'relative',overflow:'hidden',borderRadius:12,boxShadow:'0 8px 40px rgba(0,0,0,0.5), 0 0 0 3px rgba(255,255,255,0.1)',fontFamily:'sans-serif'}},
+      e('div',{style:{width:'100%',height:'100%',position:'absolute',inset:0}},
+        screen==="title"?e(TitleScreen,{onStart:startGame,stats}):null,
+        screen==="intro"?e(LevelIntro,{level,title:levelData[level-1].title,desc:levelData[level-1].desc,emoji:levelData[level-1].emoji,onStart:startLevel}):null,
+        screen==="play"?e(LevelComp,{key:key,onClear,onFail}):null,
+        screen==="clear"?e(LevelClear,{level,onNext:nextLevel}):null,
+        screen==="fail"?e(GameOver,{reason:failReason,quote:failQuote,onRetry:retry}):null,
+        screen==="ending"?e(Ending,{onRestart:startGame,fails:runFails}):null
+      ),
+      paused?e('div',{style:{position:'absolute',inset:0,zIndex:200,background:'rgba(13,10,20,0.85)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}},
+        e('div',{style:{fontSize:44}},'⏸'),
+        e('div',{style:{fontFamily:PF,fontSize:13,color:C.accent}},'일시정지'),
+        btn('▶ 계속하기',()=>setPaused(false)),
+        btn('🏠 처음으로',goTitle)
+      ):null
+    ),
+    e('div',{style:{display:'flex',justifyContent:'flex-end',gap:8,marginTop:8}},
+      screen==="play"?btn(paused?'▶ 계속':'⏸ 일시정지',()=>setPaused(p=>!p)):null,
+      btn(muted?'🔇 소리 꺼짐':'🔊 소리 켜짐',()=>setMuted(m=>!m))
     )
   );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(e(Game));
+})();
 </script>
 </body>
 </html>
