@@ -1297,6 +1297,7 @@
     ];
 
     let currentGeneratedSets = [];
+    let analysisRunning = false;   // 분석 중 중복 실행 방지
 
     // 📍 초기화: HISTORY 배열의 길이에 따라 슬라이더 최대값 설정
     window.onload = () => {
@@ -1333,8 +1334,10 @@
     }
 
     async function runAnalysis() {
+        if (analysisRunning) return;
+        analysisRunning = true;
         const birth = document.getElementById('birthDate').value;
-        const win = parseInt(document.getElementById('windowSize').value);
+        const win = Math.max(1, Math.min(HISTORY.length, parseInt(document.getElementById('windowSize').value) || 30));
         const risk = parseInt(document.getElementById('riskType').value);
         const pContainer = document.getElementById('progressContainer');
         const pBar = document.getElementById('progressBar');
@@ -1348,6 +1351,9 @@
         let models = ['M07','M12','M22','T20','T16'];
         if(risk == 0) models = ['T05','T10','T16','T20','M05'];
         if(risk == 2) models = ['M25','M30','M35','M40','T01'];
+
+        // 📍 가장 최근 win 회차만 분석 (HISTORY는 오래된 회차부터 정렬되어 있음)
+        const analysisData = HISTORY.slice(-win);
 
         let results = [];
         let totalTasks = models.length * 3;
@@ -1365,9 +1371,6 @@
 
                 let prize = 0;
                 let prizeStats = {1:0, 2:0, 3:0, 4:0, 5:0};
-                
-                // 📍 선택된 범위(win) 만큼만 슬라이싱하여 분석
-                const analysisData = HISTORY.slice(0, win);
                 
                 analysisData.forEach(row => {
                     const actual = row.slice(2,8);
@@ -1391,19 +1394,21 @@
         pContainer.style.display = 'none';
         sMsg.innerText = `최근 ${win}회차 분석 완료!`;
         document.getElementById('masterCopyBtn').style.display = 'block';
+        analysisRunning = false;
     }
 
     function renderResults(top5, birth, winSize) {
         const grid = document.getElementById('resultGrid');
-        const today = new Date().toISOString().split('T')[0];
+        const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().split('T')[0];   // 한국 시간(KST) 기준 날짜
         currentGeneratedSets = [];
+        let html = '';
         
         top5.forEach((m, i) => {
             const pick = runSimulation(m.id, m.step, today, birth);
             currentGeneratedSets.push(pick);
             const s = m.stats;
             
-            grid.innerHTML += `
+            html += `
                 <div class="result-card">
                     <div style="font-size:0.85em; color:var(--accent); font-weight:bold;">추천 ${i+1}순위</div>
                     <div class="lotto-numbers">${pick.join('  ')}</div>
@@ -1417,11 +1422,23 @@
                     </div>
                 </div>`;
         });
+        grid.innerHTML = html;   // 한 번에 렌더링
     }
 
     function copyAllToClipboard() {
         const text = currentGeneratedSets.map((s, i) => `제 ${i+1}게임: ${s.join(', ')}`).join('\n');
-        navigator.clipboard.writeText(text).then(() => { alert("클립보드에 복사되었습니다!"); });
+        const done = () => alert("클립보드에 복사되었습니다!");
+        const fallback = () => {
+            const ta = document.createElement('textarea');
+            ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+            document.body.appendChild(ta); ta.select();
+            let ok = false;
+            try { ok = document.execCommand('copy'); } catch (e) {}
+            ta.remove();
+            if (ok) done(); else alert("복사에 실패했습니다. 아래 번호를 직접 복사해 주세요.\n\n" + text);
+        };
+        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, fallback);
+        else fallback();
     }
 </script>
 </body>
