@@ -4,11 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>어둠 속의 집 - 생존 공포 게임</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&amp;family=Creepster&amp;display=swap">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&family=Creepster&display=swap');
 *{margin:0;padding:0;box-sizing:border-box;}
 :root{--blood:#8B0000;--blood-glow:#ff2222;--dark:#0a0a0a;--darker:#050505;--text:#c8c8c8;--text-dim:#666;--warning:#ff4444;--safe:#22aa44;--gold:#ffd700;}
-body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-serif;overflow:hidden;height:100vh;width:100vw;user-select:none;-webkit-user-select:none;}
+body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-serif;overflow:hidden;height:100vh;width:100vw;user-select:none;-webkit-user-select:none;touch-action:manipulation;}
 .vignette{position:fixed;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,0.85) 100%);pointer-events:none;z-index:1000;}
 .scanlines{position:fixed;top:0;left:0;right:0;bottom:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.06) 2px,rgba(0,0,0,0.06) 4px);pointer-events:none;z-index:1001;}
 .screen{position:fixed;top:0;left:0;right:0;bottom:0;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:400;}
@@ -258,7 +260,7 @@ body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-
 </div>
 
 <div class="blackout" id="blackout"></div>
-<div class="jumpscare-img" id="jumpscareImg"><img src="https://images.pexels.com/photos/29397077/pexels-photo-29397077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt=""></div>
+<div class="jumpscare-img" id="jumpscareImg"><img src="https://images.pexels.com/photos/29397077/pexels-photo-29397077.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2" alt="" referrerpolicy="no-referrer" decoding="async"></div>
 <div class="jumpscare" id="jumpscare"><div class="horror-container"><div class="horror-blood"></div><div class="horror-drip"></div><div class="horror-splat"></div><div class="horror-splat"></div><div class="horror-splat"></div><div class="horror-splat"></div><div class="horror-splat"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-streak"></div><div class="horror-static"></div><div class="horror-edges"></div></div></div>
 <div class="screen" id="result-screen"><div class="result-header"><h2 id="resultTitle"></h2><div class="result-sub" id="resultSub"></div></div><div class="result-stats" id="resultStats"></div><div class="result-map-container" id="resultMapContainer"><div class="result-map-title">─── 집 전체 현황 ───</div><div class="result-map" id="resultMap"></div></div><button class="gbtn secondary" id="retryBtn">다시 도전</button><button class="gbtn" id="nextStageBtn" style="display:none">다음 스테이지 →</button><div style="height:40px"></div></div>
 
@@ -284,7 +286,7 @@ class Au{
   danger(){this.t(80,0.3,'sawtooth',0.2);this.t(85,0.3,'sawtooth',0.18);}
   doorOpen(){this.t(180,0.2,'triangle',0.15);setTimeout(()=>this.t(120,0.3,'sine',0.1),100);}
   wrong(){this.t(200,0.3,'square',0.2);this.t(150,0.3,'sawtooth',0.15);}
-  amb(){if(!this.c||!this.on)return;const o=this.c.createOscillator(),g=this.c.createGain();o.type='sawtooth';o.frequency.value=40;g.gain.value=0.04;o.connect(g);g.connect(this.g);o.start();this._a=o;}
+  amb(){if(!this.c||!this.on)return;this.stopAmb();const o=this.c.createOscillator(),g=this.c.createGain();o.type='sawtooth';o.frequency.value=40;g.gain.value=0.04;o.connect(g);g.connect(this.g);o.start();this._a=o;}
   stopAmb(){if(this._a){this._a.stop();this._a=null;}}
 }
 const au=new Au();
@@ -486,10 +488,8 @@ function renderMazeRoom(){
     let x,y;
     if(tc<c){x=8;y=45;}// left
     else if(tc>c){x=92;y=45;}// right
-    else if(tr<r){x=50;y:12;y=10;}// up
+    else if(tr<r){x=50;y=10;}// up
     else{x=50;y=85;}// down
-    // Fix up case
-    if(tr<r){x=50;y=10;}
     doorPositions.push({target,x,y});
   });
 
@@ -499,7 +499,7 @@ function renderMazeRoom(){
     const el=document.createElement('div');
     el.className='maze-obj maze-door'+(isExit?' exit-door':'');
     el.style.cssText=`left:${dp.x}%;top:${dp.y}%;transform:translate(-50%,-50%);`;
-    el.innerHTML=`<span class="emoji">${isExit?'🚪':'🚪'}</span><span class="obj-label">${isExit?'':'방 '+(dp.target+1)}</span>`;
+    el.innerHTML=`<span class="emoji">🚪</span><span class="obj-label">${isExit?'':'방 '+(dp.target+1)}</span>`;
     el.onclick=()=>mazeDoorClick(dp.target,isCorrectPath||isExit);
     ob.appendChild(el);
   });
@@ -532,6 +532,7 @@ function showMazeMsg(msg){const el=document.getElementById('mazeMsg');el.textCon
 
 function renderMazeMinimap(){
   const mm=document.getElementById('mazeMinimap');mm.innerHTML='';
+  const killerDist=getDistance(MZ.pos,MZ.killer);
   for(let i=0;i<12;i++){
     const d=document.createElement('div');
     let cls='maze-mm-cell';
@@ -539,7 +540,6 @@ function renderMazeMinimap(){
     else if(MZ.visited.has(i))cls+=' mm-visited';
     if(i===MZ.exit)cls+=' mm-exit';
     // Show killer on minimap with flicker (only when close or sometimes)
-    const killerDist=getDistance(MZ.pos,MZ.killer);
     if(i===MZ.killer&&(killerDist<=3||Math.random()<0.3))cls+=' mm-killer';
     d.className=cls;
     d.textContent=i===MZ.pos?'📍':(i===MZ.exit?'🚪':'');
@@ -548,8 +548,11 @@ function renderMazeMinimap(){
 }
 
 // ========== STAGE 4: ROOFTOP ESCAPE ==========
+let rfRun=0;
+// 현재 판(run)이 진행 중일 때만 실행되는 타임아웃
+function rfTimeout(fn,ms){const run=RF.run;return setTimeout(()=>{if(RF.run===run&&RF.phase!=='done')fn();},ms);}
 let RF={floor:1,maxFloor:5,phase:'',timer:null,timeLeft:40,climbClicks:0,climbNeeded:20,
-  obstacleActive:false,correctSide:'',code:[],input:[],codeHints:[],attempt:0};
+  correctSide:'',code:[],input:[],codeHints:[],attempt:0,run:0};
 
 function startStage4(){
   currentStage=4;hideAll();showScreen('intro-screen');au.init();
@@ -567,7 +570,7 @@ function showStoryScene4(){
 
 function startRooftop(){
   RF={floor:1,maxFloor:5,phase:'climb',timer:null,timeLeft:60, /* ⏱️ 스테이지4 제한시간: 60초 */climbClicks:0,climbNeeded:20,
-    obstacleActive:false,correctSide:'',code:generateCode(),input:[],attempt:0};
+    correctSide:'',code:generateCode(),input:[],attempt:0,run:++rfRun};
   RF.codeHints=generateHints(RF.code);
   hideAll();showScreen('rooftop-screen');au.amb();
   updateRoofTimer();renderFloor();startRoofTimer();
@@ -583,7 +586,7 @@ function generateHints(code){
     (d)=>`셋째 자리: ${code[2]<5?'5 미만':'5 이상'}`,
     (d)=>`넷째 자리: ${code[3]}`,
   ];
-  hintTemplates.forEach((fn,i)=>{
+  hintTemplates.forEach((fn)=>{
     const dummy=Math.floor(Math.random()*10);
     hints.push(fn(dummy));
   });
@@ -641,12 +644,12 @@ function onRoofTap(){
       if(RF.floor<RF.maxFloor){
         // Show hint for this floor
         showFloorHint();
-        setTimeout(()=>startObstacle(),1500);
+        rfTimeout(()=>startObstacle(),1500);
       }else{
         // Reached rooftop!
         document.getElementById('roofClimbArea').style.display='none';
         document.getElementById('obstacleArea').innerHTML='<div style="text-align:center;color:var(--gold);font-size:clamp(0.9rem,2.2vw,1.1rem);padding-top:20px;">옥상에 도착했다! 하지만 문이 잠겨있다!</div>';
-        setTimeout(()=>startKeypad(),2000);
+        rfTimeout(()=>startKeypad(),2000);
       }
     }
   }
@@ -661,7 +664,7 @@ function showFloorHint(){
 }
 
 function startObstacle(){
-  RF.phase='obstacle';RF.obstacleActive=true;
+  RF.phase='obstacle';
   const obstacles=['🪨','🛢️','📦','⚡','🔥'];
   const ob=obstacles[Math.floor(Math.random()*obstacles.length)];
   RF.correctSide=Math.random()<0.5?'left':'right';
@@ -683,7 +686,7 @@ function startObstacle(){
   },100);
 
   // Auto-fail if no response in 2 seconds
-  RF._obstacleTimeout=setTimeout(()=>{
+  RF._obstacleTimeout=rfTimeout(()=>{
     if(RF.phase==='obstacle'){dodge('timeout');}
   },2000); /* ⏱️ 장애물 회피 제한시간: 2초 */
 }
@@ -691,14 +694,14 @@ function startObstacle(){
 function dodge(side){
   if(RF.phase!=='obstacle')return;
   clearTimeout(RF._obstacleTimeout);
-  RF.phase='wait';RF.obstacleActive=false;
+  RF.phase='wait';
   
   const correct=side===RF.correctSide;
   if(correct){
     au.move();
     const btn=document.getElementById(side==='left'?'dodgeLeft':'dodgeRight');
     if(btn)btn.classList.add('correct');
-    setTimeout(()=>{
+    rfTimeout(()=>{
       RF.floor++;renderFloor();startClimbPhase();
     },800);
   }else{
@@ -706,7 +709,7 @@ function dodge(side){
     const oa=document.getElementById('obstacleArea');
     oa.innerHTML=`<div style="text-align:center;color:var(--warning);font-size:clamp(0.9rem,2.2vw,1.1rem);padding-top:30px;">💥 맞았다! (-3초)</div>`;
     if(side==='timeout')oa.innerHTML=`<div style="text-align:center;color:var(--warning);font-size:clamp(0.9rem,2.2vw,1.1rem);padding-top:30px;">💥 너무 늦었다! (-3초)</div>`;
-    setTimeout(()=>{RF.floor++;renderFloor();startClimbPhase();},1000);
+    rfTimeout(()=>{RF.floor++;renderFloor();startClimbPhase();},1000);
   }
 }
 
@@ -792,7 +795,6 @@ document.getElementById('tapArea').addEventListener('touchstart',(e)=>{e.prevent
 // Rooftop tap - use the entire roof scene
 document.getElementById('roofScene').addEventListener('mousedown',(e)=>{if(e.target.closest('.obstacle-btn,.keypad-btn,.keypad-overlay'))return;onRoofTap();});
 document.getElementById('roofScene').addEventListener('touchstart',(e)=>{if(e.target.closest('.obstacle-btn,.keypad-btn,.keypad-overlay'))return;e.preventDefault();onRoofTap();},{passive:false});
-let lt=0;document.addEventListener('touchend',e=>{const n=Date.now();if(n-lt<300)e.preventDefault();lt=n;},{passive:false});
 initState(30,HOUSE1);
 </script>
 </body>

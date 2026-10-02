@@ -7,8 +7,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>🎯 스나이퍼 챔피언십</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&amp;family=Orbitron:wght@700;900&amp;family=Noto+Sans+KR:wght@400;700&amp;display=swap">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Orbitron:wght@700;900&family=Noto+Sans+KR:wght@400;700&display=swap');
 
 :root {
   --bg: #0a0c0f;
@@ -464,7 +466,7 @@ body {
 // ─────────────────────────────
 //  DEVICE
 // ─────────────────────────────
-const isMobile = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+const isMobile = window.matchMedia('(pointer: coarse)').matches;  // 주 입력이 터치일 때만 모바일 조작
 
 // ─────────────────────────────
 //  STATE
@@ -483,6 +485,10 @@ const joy = { active:false, startX:0, startY:0, dx:0, dy:0, id:null };
 let cvx=0, cvy=0;   // crosshair velocity
 let targets=[], particles=[], bulletHoles=[];
 let rafId=null, stageTimer=null, timeLeft=15, lastTs=0;
+let reloadTimer=null, announceTimer=null;
+
+function clampInt(v,lo,hi,d){ return Math.min(hi,Math.max(lo,parseInt(v)||d)); }
+function mkEl(tag,text,props){ const el=document.createElement(tag); if(text!==undefined) el.textContent=text; if(props) Object.assign(el,props); return el; }
 
 // ─────────────────────────────
 //  SOUND ENGINE (Web Audio API)
@@ -494,14 +500,17 @@ function getACtx(){
   return audioCtx;
 }
 
+let gunBuf=null;
 function playGunshot(){
   const ctx=getACtx(), t=ctx.currentTime;
-  // 노이즈 (총성 몸체)
-  const bufLen=ctx.sampleRate*0.25;
-  const buf=ctx.createBuffer(1,bufLen,ctx.sampleRate);
-  const d=buf.getChannelData(0);
-  for(let i=0;i<bufLen;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/bufLen,2.5);
-  const src=ctx.createBufferSource(); src.buffer=buf;
+  // 노이즈 (총성 몸체) - 버퍼는 한 번만 만들어 재사용
+  if(!gunBuf||gunBuf.sampleRate!==ctx.sampleRate){
+    const bufLen=Math.ceil(ctx.sampleRate*0.25);
+    gunBuf=ctx.createBuffer(1,bufLen,ctx.sampleRate);
+    const d=gunBuf.getChannelData(0);
+    for(let i=0;i<bufLen;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/bufLen,2.5);
+  }
+  const src=ctx.createBufferSource(); src.buffer=gunBuf;
   const lp=ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=900;
   const gain=ctx.createGain();
   gain.gain.setValueAtTime(0,t);
@@ -609,14 +618,14 @@ function playGameOver(){
 //  PLAYER INPUTS
 // ─────────────────────────────
 function renderPlayerInputs() {
-  const n = Math.max(1, Math.min(8, parseInt(document.getElementById('playerCount').value)||2));
+  const n = clampInt(document.getElementById('playerCount').value,1,8,2);
   const cont = document.getElementById('playerNames');
   const old = Array.from(cont.querySelectorAll('input')).map(i=>i.value);
-  cont.innerHTML='';
+  cont.textContent='';
   for (let i=0;i<n;i++) {
-    const d=document.createElement('div'); d.className='player-row';
-    d.innerHTML=`<div class="player-badge">${i+1}</div>
-      <input type="text" placeholder="PLAYER ${i+1}" value="${old[i]||''}">`;
+    const d=mkEl('div',undefined,{className:'player-row'});
+    const inp=mkEl('input',undefined,{type:'text',placeholder:`PLAYER ${i+1}`,maxLength:12,value:old[i]||''});
+    d.append(mkEl('div',String(i+1),{className:'player-badge'}),inp);
     cont.appendChild(d);
   }
 }
@@ -627,12 +636,12 @@ renderPlayerInputs();
 //  GAME START
 // ─────────────────────────────
 function startGame() {
-  const n = parseInt(document.getElementById('playerCount').value)||2;
+  const n = clampInt(document.getElementById('playerCount').value,1,8,2);
   const names = Array.from(document.querySelectorAll('#playerNames input'))
     .map((inp,i)=>inp.value.trim()||`PLAYER ${i+1}`);
   gs.players = names.slice(0,n);
-  gs.stageCount = parseInt(document.getElementById('stageCount').value)||3;
-  gs.timePerStage = parseInt(document.getElementById('timePerStage').value)||15;
+  gs.stageCount = clampInt(document.getElementById('stageCount').value,1,10,3);
+  gs.timePerStage = clampInt(document.getElementById('timePerStage').value,5,60,15);
   gs.pIdx=0; gs.stage=1;
   gs.totalScores = Array(n).fill(0);
   gs.cx=0.5; gs.cy=0.5; gs.zoom=1; gs.adsActive=false;
@@ -645,15 +654,18 @@ function startGame() {
 //  STAGE INIT
 // ─────────────────────────────
 function initStage() {
+  gs.phase='announce';   // 안내 문구 동안에는 발사 불가
+  clearTimeout(reloadTimer); clearTimeout(announceTimer);
   targets=[]; particles=[]; bulletHoles=[];
   gs.ammo=gs.maxAmmo; cvx=0; cvy=0;
   gs.cx=0.5; gs.cy=0.5;
   updateAmmoBar();
 
   const ann=document.getElementById('stageAnnounce');
-  ann.innerHTML=`${gs.players[gs.pIdx]}<br>STAGE ${gs.stage} / ${gs.stageCount}`;
+  ann.textContent='';
+  ann.append(document.createTextNode(gs.players[gs.pIdx]), document.createElement('br'), document.createTextNode(`STAGE ${gs.stage} / ${gs.stageCount}`));
   ann.classList.add('show');
-  setTimeout(()=>{ ann.classList.remove('show'); playStageStart(); beginPlay(); }, 2000);
+  announceTimer=setTimeout(()=>{ ann.classList.remove('show'); playStageStart(); beginPlay(); }, 2000);
 }
 
 function beginPlay() {
@@ -750,9 +762,11 @@ function gameLoop(ts) {
 // ─────────────────────────────
 //  DRAW WORLD
 // ─────────────────────────────
-function drawWorld(ctx,W,H,dt) {
-  const worldH=H*0.72;
-
+let bgCache=null;
+function getBg(W,H,worldH){
+  if(bgCache&&bgCache.width===W&&bgCache.height===H) return bgCache;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const ctx=c.getContext('2d');
   // Sky
   const sky=ctx.createLinearGradient(0,0,0,worldH);
   sky.addColorStop(0,'#080e18');
@@ -776,6 +790,13 @@ function drawWorld(ctx,W,H,dt) {
   ctx.fillText('50m',8,worldH-6);
   ctx.fillText('100m',W/2-18,worldH-6);
   ctx.fillText('200m',W-46,worldH-6);
+  bgCache=c; return c;
+}
+
+function drawWorld(ctx,W,H,dt) {
+  const worldH=H*0.72;
+
+  ctx.drawImage(getBg(W,H,worldH),0,0);
 
   // Bullet holes
   for(const bh of bulletHoles){
@@ -994,7 +1015,7 @@ function doShoot(){
     showScorePopup(sx,sy,-1);
     playMiss();  // 빗나감
   }
-  if(gs.ammo<=0) setTimeout(()=>{ gs.ammo=gs.maxAmmo; updateAmmoBar(); playReload(); },1200);
+  if(gs.ammo<=0){ clearTimeout(reloadTimer); reloadTimer=setTimeout(()=>{ gs.ammo=gs.maxAmmo; updateAmmoBar(); playReload(); },1200); }
 }
 
 // ─────────────────────────────
@@ -1133,7 +1154,9 @@ function showResult(){
   sorted.forEach((p,i)=>{
     const m=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
     const tr=document.createElement('tr');
-    tr.innerHTML=`<td>${m}</td><td>${p.name}</td><td style="color:var(--accent);font-family:'Orbitron',monospace">${p.score.toLocaleString()}</td>`;
+    const tdScore=mkEl('td',p.score.toLocaleString());
+    tdScore.style.cssText="color:var(--accent);font-family:'Orbitron',monospace";
+    tr.append(mkEl('td',m),mkEl('td',p.name),tdScore);
     tbody.appendChild(tr);
   });
   saveRanking(sorted);
@@ -1143,7 +1166,14 @@ function showResult(){
 // ─────────────────────────────
 //  RANKING
 // ─────────────────────────────
-function getRanking(){ try{return JSON.parse(localStorage.getItem('sniper_championship_ranking')||'[]')}catch{return[];} }
+function getRanking(){
+  try{
+    const r=JSON.parse(localStorage.getItem('sniper_championship_ranking')||'[]');
+    if(!Array.isArray(r)) return [];
+    return r.filter(e=>e&&typeof e.name==='string'&&Number.isFinite(e.score))
+            .map(e=>({name:e.name.slice(0,12),score:e.score,date:String(e.date||'')}));
+  }catch{return[];}
+}
 function saveRanking(sorted){
   const r=getRanking();
   sorted.forEach(p=>r.push({name:p.name,score:p.score,date:new Date().toLocaleDateString('ko-KR')}));
@@ -1160,7 +1190,11 @@ function showRanking(){
   else r.forEach((e,i)=>{
     const m=i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}`;
     const d=document.createElement('div'); d.className='rank-row';
-    d.innerHTML=`<div class="rank-pos">${m}</div><div class="rank-name">${e.name}<br><span style="font-size:10px;color:var(--muted);">${e.date||''}</span></div><div class="rank-score">${e.score.toLocaleString()}</div>`;
+    const nameBox=mkEl('div',undefined,{className:'rank-name'});
+    const dateEl=mkEl('span',e.date);
+    dateEl.style.cssText='font-size:10px;color:var(--muted);';
+    nameBox.append(document.createTextNode(e.name),document.createElement('br'),dateEl);
+    d.append(mkEl('div',m,{className:'rank-pos'}),nameBox,mkEl('div',e.score.toLocaleString(),{className:'rank-score'}));
     list.appendChild(d);
   });
   showScreen('ranking');
@@ -1205,6 +1239,7 @@ function showScreen(name){
 
 function goTitle(){
   clearInterval(stageTimer); cancelAnimationFrame(rafId);
+  clearTimeout(reloadTimer); clearTimeout(announceTimer);
   targets=[]; particles=[]; bulletHoles=[];
   showScreen('title');
 }

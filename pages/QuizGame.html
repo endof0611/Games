@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>가족 퀴즈 대결</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Jua&display=swap');
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&amp;family=Jua&amp;display=swap">
+<style>
         
         * {
             margin: 0;
@@ -542,8 +544,14 @@
         let players = [];
         let currentQuestionIndex = 0;
         let questions = [];
-        let scores = {};
+        let scores = Object.create(null);   // 이름이 "__proto__" 등이어도 안전하게
         let selectedWinners = {};
+        let generating = false;
+
+        // AI 응답·사용자 입력을 innerHTML에 넣을 때 사용 (XSS 방지)
+        function esc(s) {
+            return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
         
         function addPlayer() {
             const playerInputs = document.getElementById('playerInputs');
@@ -573,6 +581,7 @@
         }
         
         async function startQuiz() {
+            if (generating) return;   // 중복 클릭 방지
             // 참가자 이름 수집
             const playerInputs = document.querySelectorAll('.player-name');
             players = Array.from(playerInputs)
@@ -608,7 +617,7 @@
             }
             
             // 점수 초기화
-            scores = {};
+            scores = Object.create(null);
             players.forEach(player => scores[player] = 0);
             
             const difficulty = document.getElementById('difficulty').value;
@@ -616,6 +625,7 @@
             
             // 로딩 화면 표시
             showScreen('loadingScreen');
+            generating = true;
             
             try {
                 // AI에게 퀴즈 생성 요청
@@ -626,7 +636,7 @@
                     },
                     body: JSON.stringify({
                         model: 'claude-sonnet-4-20250514',
-                        max_tokens: 1000,
+                        max_tokens: Math.min(8000, 500 + questionCount * 250),   // 문제 수에 맞춰 응답이 잘리지 않게
                         messages: [{
                             role: 'user',
                             content: `한국인을 위한 퀴즈를 ${questionCount}개 만들어주세요.
@@ -667,9 +677,12 @@
                     })
                 });
                 
-                const data = await response.json();
+                const data = await response.json().catch(() => ({}));
                 
-                if (!data.content || data.content.length === 0) {
+                if (!response.ok) {
+                    throw new Error((data.error && data.error.message) || `서버 응답 오류 (${response.status})`);
+                }
+                if (!Array.isArray(data.content) || data.content.length === 0) {
                     throw new Error('퀴즈 생성에 실패했습니다.');
                 }
                 
@@ -681,10 +694,15 @@
                     }
                 }
                 
-                // JSON 파싱 (백틱 제거)
-                jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-                const quizData = JSON.parse(jsonText);
-                questions = quizData.questions;
+                // JSON 파싱 (코드블록·앞뒤 설명이 섞여도 첫 { ~ 마지막 } 만 사용)
+                const jsonStart = jsonText.indexOf('{'), jsonEnd = jsonText.lastIndexOf('}');
+                if (jsonStart === -1 || jsonEnd <= jsonStart) {
+                    throw new Error('AI 응답에서 퀴즈 데이터를 찾지 못했습니다.');
+                }
+                const quizData = JSON.parse(jsonText.slice(jsonStart, jsonEnd + 1));
+                questions = Array.isArray(quizData.questions)
+                    ? quizData.questions.filter(q => q && typeof q.question === 'string' && q.answer != null)
+                    : [];
                 
                 if (!questions || questions.length === 0) {
                     throw new Error('퀴즈 문제가 생성되지 않았습니다.');
@@ -701,6 +719,8 @@
                 console.error('Error:', error);
                 showScreen('setupScreen');
                 alert('퀴즈 생성 중 오류가 발생했습니다. 다시 시도해주세요.\n오류: ' + error.message);
+            } finally {
+                generating = false;
             }
         }
         
@@ -716,16 +736,16 @@
             
             // 카테고리 배지 생성
             const categoryBadge = question.category ? 
-                `<div style="display: inline-block; background: var(--accent); color: var(--dark); padding: 5px 15px; border-radius: 20px; font-size: 0.9em; margin-bottom: 10px; font-family: 'Jua', sans-serif;">📌 ${question.category}</div>` : '';
+                `<div style="display: inline-block; background: var(--accent); color: var(--dark); padding: 5px 15px; border-radius: 20px; font-size: 0.9em; margin-bottom: 10px; font-family: 'Jua', sans-serif;">📌 ${esc(question.category)}</div>` : '';
             
             // 퀴즈 카드 생성
             quizContent.innerHTML = `
                 <div class="quiz-card">
                     ${categoryBadge}
                     <div class="question-number">문제 ${currentQuestionIndex + 1}</div>
-                    <div class="question-text">${question.question}</div>
+                    <div class="question-text">${esc(question.question)}</div>
                     <div class="answer-label">💡 정답:</div>
-                    <div class="answer-text">${question.answer}</div>
+                    <div class="answer-text">${esc(question.answer)}</div>
                     
                     <div style="margin-top: 30px;">
                         <div class="answer-label">🏅 이 문제를 맞힌 사람을 선택하세요:</div>
@@ -826,7 +846,7 @@
                 const isWinner = index === 0;
                 return `
                     <div class="score-item ${isWinner ? 'winner' : ''}">
-                        <span class="score-name">${index + 1}. ${player[0]}</span>
+                        <span class="score-name">${index + 1}. ${esc(player[0])}</span>
                         <span class="score-points">${player[1]}점</span>
                     </div>
                 `;
@@ -843,7 +863,7 @@
         function resetQuiz() {
             currentQuestionIndex = 0;
             questions = [];
-            scores = {};
+            scores = Object.create(null);
             selectedWinners = {};
             showScreen('setupScreen');
         }
