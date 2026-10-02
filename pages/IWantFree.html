@@ -276,10 +276,11 @@ function Level1({onClear,onFail}) {
 
   useEffect(()=>{
     if(phase!=="sneak")return;
-    let t;
+    let t,snoreRepeat;
     const cycle=()=>{
       setSnoring(true);setSnoreText("드르렁~");setMomEmoji("😴");SFX.snore();
-      const snoreRepeat=setInterval(()=>SFX.snore(),900);
+      clearInterval(snoreRepeat);
+      snoreRepeat=setInterval(()=>SFX.snore(),900);
       const sd=2000+Math.random()*2500;
       t=setTimeout(()=>{
         clearInterval(snoreRepeat);
@@ -289,7 +290,7 @@ function Level1({onClear,onFail}) {
       },sd);
     };
     cycle();
-    return ()=>clearTimeout(t);
+    return ()=>{clearTimeout(t);clearInterval(snoreRepeat);};
   },[phase]);
 
   useEffect(()=>{
@@ -397,7 +398,7 @@ function Level2({onClear,onFail}) {
 
   useEffect(()=>{
     if(phase!=="sneak"&&phase!=="fridge")return;
-    const i=setInterval(()=>setMomAngle(a=>(a+1.5)%360),30);
+    const i=setInterval(()=>setMomAngle(a=>(a+1.2)%360),30);
     return ()=>clearInterval(i);
   },[phase]);
 
@@ -417,7 +418,7 @@ function Level2({onClear,onFail}) {
     const x=(ev.clientX-rect.left)/rect.width*GAME_W;
     const y=(ev.clientY-rect.top)/rect.height*GAME_H;
     setPlayerPos(p=>{
-      const dx=x-p.x,dy=y-p.y,dist=Math.sqrt(dx*dx+dy*dy),speed=8;
+      const dx=x-p.x,dy=y-p.y,dist=Math.sqrt(dx*dx+dy*dy),speed=22;
       if(dist<speed)return{x:Math.max(20,Math.min(GAME_W-20,x)),y:Math.max(60,Math.min(GAME_H-20,y))};
       return{x:Math.max(20,Math.min(GAME_W-20,p.x+dx/dist*speed)),y:Math.max(60,Math.min(GAME_H-20,p.y+dy/dist*speed))};
     });
@@ -433,7 +434,7 @@ function Level2({onClear,onFail}) {
     if(phase!=="fridge")return;
     const i=setInterval(()=>{
       if(pressingRef.current){
-        fridgeRef.current=Math.min(fridgeRef.current+0.6,100);
+        fridgeRef.current=Math.min(fridgeRef.current+0.9,100);
         setFridgeProgress(fridgeRef.current);
         if(Math.random()<0.05)SFX.fridgeCreak();
         setNoiseGauge(n=>{const nn=Math.min(n+0.25,100);if(nn>=100&&!caught.current){caught.current=true;onFail("냉장고를 너무 세게 열어서 소리가 났다!\n더 천천히 열어야 해!");}return nn;});
@@ -510,6 +511,8 @@ function Level3({onClear,onFail}) {
   const caught=useRef(false);
   const groundY=300;
   const distRef=useRef(0);
+  const phoneRef=useRef(0);
+  const needPhone=50;
 
   useEffect(()=>{
     const spawnInterval=90;let frame=0;
@@ -519,7 +522,10 @@ function Level3({onClear,onFail}) {
       frame++;
       distRef.current+=speed;
       setDistance(distRef.current);
-      if(distRef.current>=maxDist){clearInterval(i);setTimeout(()=>onClear(),300);return;}
+      if(distRef.current>=maxDist){clearInterval(i);
+        if(phoneRef.current>=needPhone)setTimeout(()=>onClear(),300);
+        else{caught.current=true;onFail("폰 게임 레벨업을 못 했다!\n걸으면서도 폰 게임을 열심히 해야 해! 📱");}
+        return;}
       setObstacles(obs=>{
         let nw=obs.map(o=>({...o,x:o.x-speed*2.2})).filter(o=>o.x>-50);
         if(frame%spawnInterval===0||(frame>300&&frame%70===0)){
@@ -532,7 +538,7 @@ function Level3({onClear,onFail}) {
       else{setPlayerY(y=>{if(y<groundY)return Math.min(y+5,groundY);return groundY;});setJumping(false);}
     },16);
     return ()=>clearInterval(i);
-  },[onClear]);
+  },[onClear,onFail]);
 
   useEffect(()=>{
     if(caught.current)return;
@@ -548,7 +554,7 @@ function Level3({onClear,onFail}) {
   const handleJump=(ev)=>{
     const rect=ev.currentTarget.getBoundingClientRect();
     const clickY=(ev.clientY-rect.top)/rect.height;
-    if(clickY>0.85){SFX.phoneTap();setPhoneGauge(g=>Math.min(g+3,100));return;}
+    if(clickY>0.85){SFX.phoneTap();phoneRef.current=Math.min(phoneRef.current+4,100);setPhoneGauge(phoneRef.current);return;}
     if(playerY>=groundY-5&&!jumpRef.current){SFX.jump();jumpRef.current=true;setJumping(true);}
   };
 
@@ -574,20 +580,21 @@ function Level3({onClear,onFail}) {
       o.isDanger?e('div',{style:{fontFamily:PF,fontSize:5,color:C.mom,textAlign:'center',position:'absolute',bottom:-12,width:50,left:-10}},'엄마친구!'):null
     )),
     // Player
-    e('div',{style:{position:'absolute',left:55,bottom:GAME_H-playerY-60,fontSize:36,zIndex:10}},'🏃'),
+    e('div',{style:{position:'absolute',left:55,bottom:GAME_H-playerY-200,fontSize:36,zIndex:10}},'🏃'),
     // Phone area
     e('div',{style:{position:'absolute',bottom:0,left:0,right:0,height:80,background:'linear-gradient(180deg,rgba(0,0,0,0.8),#111)',borderTop:'2px solid #444',display:'flex',alignItems:'center',justifyContent:'center',gap:16,zIndex:20}},
       e('div',{style:{fontFamily:PF,fontSize:7,color:C.accent}},'📱 폰게임 탭!'),
-      e('div',{style:{width:140,height:16,background:'#333',border:'2px solid #555',borderRadius:4,overflow:'hidden'}},
-        e('div',{style:{width:`${phoneGauge}%`,height:'100%',background:`linear-gradient(90deg,#4488ff,${C.kid})`,transition:'width 0.05s'}})
+      e('div',{style:{width:140,height:16,background:'#333',border:'2px solid #555',borderRadius:4,overflow:'hidden',position:'relative'}},
+        e('div',{style:{width:`${phoneGauge}%`,height:'100%',background:phoneGauge>=needPhone?`linear-gradient(90deg,${C.safe},#22ff88)`:`linear-gradient(90deg,#4488ff,${C.kid})`,transition:'width 0.05s'}}),
+        e('div',{style:{position:'absolute',left:`${needPhone}%`,top:0,bottom:0,width:2,background:C.accent}})
       ),
-      e('div',{style:{fontFamily:PF,fontSize:6,color:'rgba(255,255,255,0.5)'}},`${Math.round(phoneGauge)}%`)
+      e('div',{style:{fontFamily:PF,fontSize:6,color:phoneGauge>=needPhone?C.safe:'rgba(255,255,255,0.5)'}},`${Math.round(phoneGauge)}% / ${needPhone}%`)
     ),
     // Progress
     e('div',{style:{position:'absolute',top:30,left:30,right:30,height:8,background:'rgba(0,0,0,0.3)',borderRadius:4,overflow:'hidden',zIndex:15}},
       e('div',{style:{width:`${progress*100}%`,height:'100%',background:`linear-gradient(90deg,${C.safe},${C.accent})`,transition:'width 0.1s'}})
     ),
-    e('div',{style:{position:'absolute',top:45,left:'50%',transform:'translateX(-50%)',fontFamily:PF,fontSize:6,color:'rgba(0,0,0,0.5)',zIndex:15}},'위쪽 탭 = 점프! / 아래 폰 탭 = 게임!')
+    e('div',{style:{position:'absolute',top:45,left:'50%',transform:'translateX(-50%)',fontFamily:PF,fontSize:6,color:'rgba(0,0,0,0.5)',zIndex:15}},'위쪽 탭 = 점프! / 아래 폰 탭으로 게이지 50% 채우기!')
   );
 }
 
@@ -736,7 +743,7 @@ function Ending({onRestart}) {
 const levelData=[
   {title:"스마트폰 서리 작전",desc:"엄마가 코 골 때만 움직여!\n폰을 집으면 카톡 알림이... 무음 버튼 연타!",emoji:"📱"},
   {title:"아이스크림 닌자",desc:"엄마의 부채꼴 시야를 피해 냉장고로!\n문은 천천히 열어야 소리가 안 나!",emoji:"🍦"},
-  {title:"스몸비 챌린지",desc:"위쪽 탭 = 장애물 점프!\n아래쪽 폰 탭 = 게임 진행!\n아줌마를 조심해!",emoji:"🛹"},
+  {title:"스몸비 챌린지",desc:"위쪽 탭 = 장애물 점프!\n아래쪽 폰 탭 = 게임 진행! (도착 전 50% 채우기)\n아줌마를 조심해!",emoji:"🛹"},
   {title:"완벽한 알리바이",desc:"발소리가 들리면 탭해서 폰 숨기기!\n엄마 검사 중엔 절대 터치 금지!\n3라운드 버티면 성공!",emoji:"📚"},
 ];
 const Levels=[Level1,Level2,Level3,Level4];
@@ -746,17 +753,19 @@ function Game() {
   const [level,setLevel]=useState(1);
   const [failReason,setFailReason]=useState("");
   const [key,setKey]=useState(0);
+  const playing=useRef(false);
 
   const startGame=()=>{setLevel(1);setScreen("intro");};
-  const startLevel=()=>{setKey(k=>k+1);setScreen("play");};
-  const onClear=()=>{SFX.stageClear();setScreen("clear");};
-  const onFail=(reason)=>{SFX.gameOver();setFailReason(reason);setScreen("fail");};
+  const startLevel=()=>{setKey(k=>k+1);playing.current=true;setScreen("play");};
+  // 클리어/실패는 한 판에 한 번만 처리 (중복 호출·경합 방지)
+  const onClear=useCallback(()=>{if(!playing.current)return;playing.current=false;SFX.stageClear();setScreen("clear");},[]);
+  const onFail=useCallback((reason)=>{if(!playing.current)return;playing.current=false;SFX.gameOver();setFailReason(reason);setScreen("fail");},[]);
   const nextLevel=()=>{if(level>=4){SFX.fanfare();setScreen("ending");}else{setLevel(l=>l+1);setScreen("intro");}};
   const retry=()=>setScreen("intro");
 
   const LevelComp=Levels[level-1];
 
-  return e('div',{style:{width:'100%',maxWidth:GAME_W,margin:'0 auto',aspectRatio:`${GAME_W}/${GAME_H}`,position:'relative',overflow:'hidden',borderRadius:12,boxShadow:'0 8px 40px rgba(0,0,0,0.5), 0 0 0 3px rgba(255,255,255,0.1)',fontFamily:'sans-serif'}},
+  return e('div',{style:{width:`min(100%, ${GAME_W}px, 80vh)`,margin:'0 auto',aspectRatio:`${GAME_W}/${GAME_H}`,position:'relative',overflow:'hidden',borderRadius:12,boxShadow:'0 8px 40px rgba(0,0,0,0.5), 0 0 0 3px rgba(255,255,255,0.1)',fontFamily:'sans-serif'}},
     e('div',{style:{width:'100%',height:'100%',position:'absolute',inset:0}},
       screen==="title"?e(TitleScreen,{onStart:startGame}):null,
       screen==="intro"?e(LevelIntro,{level,title:levelData[level-1].title,desc:levelData[level-1].desc,emoji:levelData[level-1].emoji,onStart:startLevel}):null,
@@ -771,4 +780,4 @@ function Game() {
 ReactDOM.createRoot(document.getElementById('root')).render(e(Game));
 </script>
 </body>
-</html>
+</html>
