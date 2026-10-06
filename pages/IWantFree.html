@@ -271,7 +271,7 @@ function LevelIntro({level,title,desc,emoji,onStart}) {
 
 // ─── LEVEL CLEAR ───
 function LevelClear({level,onNext}) {
-  const msgs=["겨리 스마트폰 획득! 🎉","겨리 아이스크림 GET! 🍦","겨리 무사히 탈출! 🏃","겨리 완벽한 알리바이! 😎","겨리 야식 라면 완성! 🍜","겨리 주술회전 9권 책장 완성! 📚"];
+  const msgs=["겨리 스마트폰 획득! 🎉","겨리 아이스크림 GET! 🍦","겨리 무사히 탈출! 🏃","겨리 완벽한 알리바이! 😎","겨리 야식 라면 완성! 🍜","겨리 주술회전 30권 책장 완성! 📚"];
   return e('div',{style:{width:'100%',height:'100%',background:`radial-gradient(circle at 50% 40%,#1a3a2a,${C.bg})`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}},
     e('div',{style:{fontSize:60,animation:'float 1s ease-in-out infinite'}},'⭐'),
     e('div',{style:{fontFamily:PF,fontSize:13,color:C.safe,textShadow:'2px 2px 0 #000'}},'STAGE CLEAR!'),
@@ -873,101 +873,110 @@ function Level5({onClear,onFail}) {
 
 // ═══════════════════════════════════════
 // LEVEL 6: 겨리의 책장 - 주술회전 전권 모으기
-//  · 시험(미니게임 3종)에서 좋은 점수를 받으면 한 권씩 (9권 중 6권 = 2/3)
-//  · 나머지 3권(1/3)은 생일 선물
+//  · 시험(미니게임 1판)에 성공하면 한 권씩 (30권 중 20권 = 2/3)
+//  · 나머지 10권(1/3)은 생일 선물 (시험 2권마다 생일 1번)
 // ═══════════════════════════════════════
 const EXAM_TASKS={
-  memory:{name:"📚 암기 과목",hint:"보여주는 순서를 외워서 똑같이 누르세요!",limit:6000},
-  omr:{name:"✏️ OMR 마킹",hint:"연필이 목표 번호 위에 있을 때 찍으세요!",limit:6000},
-  sleepy:{name:"😪 졸음 참기",hint:"눈꺼풀이 내려온다! 연타해서 버티세요!",limit:4000},
-  order:{name:"📄 시험지 넘기기",hint:"1부터 6까지 순서대로 빠르게 누르세요!",limit:7000},
+  memory:{name:"📚 암기 과목",hint:"보여주는 순서를 외워서 똑같이 누르세요!"},
+  omr:{name:"✏️ OMR 마킹",hint:"연필이 목표 번호 위에 있을 때 찍으세요!"},
+  sleepy:{name:"😪 졸음 참기",hint:"눈꺼풀이 내려온다! 연타해서 버티세요!"},
+  order:{name:"📄 시험지 넘기기",hint:"1부터 6까지 순서대로 빠르게 누르세요!"},
 };
 const MEMORY_ICONS=["🔥","💧","⚡","🌿"];
 function shuffleArr(a){const r=a.slice();for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]];}return r;}
-function makeTask(type){
-  if(type==="memory")return {type,seq:Array.from({length:3},()=>MEMORY_ICONS[Math.floor(Math.random()*MEMORY_ICONS.length)]),choices:shuffleArr(MEMORY_ICONS)};
-  if(type==="omr")return {type,target:1+Math.floor(Math.random()*5)};
-  if(type==="order")return {type,nums:shuffleArr([1,2,3,4,5,6])};
-  return {type};
+// lvl: 지금까지 시험으로 얻은 책 수(0~19) - 클수록 어려워진다
+function makeTask(type,lvl){
+  if(type==="memory"){const len=lvl<7?3:lvl<14?4:5;return {type,limit:6000,showMs:1300+len*300,seq:Array.from({length:len},()=>MEMORY_ICONS[Math.floor(Math.random()*MEMORY_ICONS.length)]),choices:shuffleArr(MEMORY_ICONS)};}
+  if(type==="omr")return {type,limit:6000,speed:3.0+lvl*0.13,target:1+Math.floor(Math.random()*5)};
+  if(type==="order")return {type,limit:Math.max(5000,7000-lvl*80),nums:shuffleArr([1,2,3,4,5,6])};
+  return {type,limit:3000,rate:1.6+lvl*0.06};
 }
-const PASS_LINES=['엄마: "오~ 점수 좋네! 약속대로 한 권 사줄게."','엄마: "열심히 했구나. 이번 달 만화책은 여기!"','엄마: "이 점수면 인정! 다음 권도 기대할게."'];
+const PASS_LINES=['엄마: "오~ 점수 좋네! 약속대로 한 권!"','엄마: "열심히 했구나. 이번 달 만화책!"','엄마: "이 점수면 인정! 가져가~"','엄마: "와, 시험 잘 봤네?"'];
 const FAIL_LINES=['엄마: "이 점수로 만화책? 안 돼!"','엄마: "다음 시험 잘 보면 생각해 볼게."','엄마: "공부는 안 하고 만화책 생각만 했지?"'];
 
 function Level6({onClear,onFail}) {
-  const TOTAL=9,EXAM_VOLS=6,QS=3,PASS=2,MAX_FAILS=3,BIRTH_TAPS=[10,14,18],BIRTH_TIME=5000,SHOW_MS=1800;
+  const TOTAL=30,MAX_FAILS=5,BIRTH_TIME=4500;
+  const birthNeed=(k)=>Math.round(8+k*1.1);          // 생일 k번째(0~9) 촛불 개수
+  const isGiftNext=(n)=>n%3===2;                      // 시험 2권마다 생일 선물 1권 → 시험 20권 + 선물 10권
   const [phase,setPhase]=useState("exam");
   const [vols,setVols]=useState([]);
   const [fails,setFails]=useState(0);
   const [examNo,setExamNo]=useState(1);
-  const [qNo,setQNo]=useState(0);
   const [task,setTask]=useState(null);
   const [timeBar,setTimeBar]=useState(100);
-  const [marks,setMarks]=useState([]);
-  const [grade,setGrade]=useState(null);
   const [feedback,setFeedback]=useState("");
-  const [step,setStep]=useState(0);       // memory: 입력한 개수 / order: 눌러야 할 다음 번호-1
+  const [momLine,setMomLine]=useState("");
+  const [step,setStep]=useState(0);       // memory: 입력한 개수 / order: 완료한 번호 수
   const [shown,setShown]=useState(false); // memory: 순서 보여주는 중
   const [marker,setMarker]=useState(0);   // omr: 연필 위치(0~100)
   const [lid,setLid]=useState(0);         // sleepy: 눈꺼풀 내려온 정도(0~100)
-  const [bday,setBday]=useState(0);
   const [taps,setTaps]=useState(0);
   const [bBar,setBBar]=useState(100);
   const [gifted,setGifted]=useState(false);
-  const phaseRef=useRef("exam"),volsRef=useRef([]),failsRef=useRef(0),qRef=useRef(0),correctRef=useRef(0);
-  const lockRef=useRef(false),taskRef=useRef(null),typesRef=useRef([]);
+  const phaseRef=useRef("exam"),volsRef=useRef([]),failsRef=useRef(0),examNoRef=useRef(1),lastTypeRef=useRef("");
+  const lockRef=useRef(false),taskRef=useRef(null);
   const stepRef=useRef(0),showRef=useRef(false),markerRef=useRef(0),dirRef=useRef(1),lidRef=useRef(0);
-  const tapsRef=useRef(0),bdayRef=useRef(0),doneRef=useRef(false);
+  const tapsRef=useRef(0),needRef=useRef(0),doneRef=useRef(false);
+  const examVols=()=>volsRef.current.filter(v=>v==="exam").length;
 
   const nextTask=()=>{
-    const t=makeTask(typesRef.current[qRef.current]);
+    const types=Object.keys(EXAM_TASKS).filter(t=>t!==lastTypeRef.current);
+    const type=types[Math.floor(Math.random()*types.length)];
+    lastTypeRef.current=type;
+    const t=makeTask(type,examVols());
     taskRef.current=t;lockRef.current=false;
     stepRef.current=0;setStep(0);markerRef.current=0;dirRef.current=1;setMarker(0);lidRef.current=0;setLid(0);
     showRef.current=t.type==="memory";setShown(showRef.current);
-    setTimeBar(100);setFeedback("");setTask(t);
+    setTimeBar(100);setFeedback("");setMomLine("");setTask(t);
   };
-  const startExamTasks=()=>{typesRef.current=shuffleArr(Object.keys(EXAM_TASKS)).slice(0,QS);};
-  useEffect(()=>{startExamTasks();nextTask();},[]);
+  useEffect(()=>{nextTask();},[]);
 
-  // 한 문제(미니게임) 결과 처리
+  const advance=()=>{
+    if(volsRef.current.length>=TOTAL){finish();return;}
+    if(isGiftNext(volsRef.current.length))startBirthday();
+    else{examNoRef.current++;setExamNo(examNoRef.current);phaseRef.current="exam";setPhase("exam");nextTask();}
+  };
+  const finish=()=>{phaseRef.current="done";setPhase("done");SFX.fanfare();setTimeout(()=>onClear(),2000);};
+
+  // 시험 한 번(미니게임 1개) 결과 처리
   const resolve=(ok,msg)=>{
     if(lockRef.current||phaseRef.current!=="exam")return;
     lockRef.current=true;
-    if(ok){correctRef.current++;SFX.muteSuccess();}else SFX.alert();
-    setMarks(m=>[...m,ok?"o":"x"]);
-    setFeedback(msg);
+    const lines=ok?PASS_LINES:FAIL_LINES;
+    setFeedback(msg);setMomLine(lines[Math.floor(Math.random()*lines.length)]);
+    if(ok){volsRef.current=[...volsRef.current,"exam"];setVols(volsRef.current);SFX.muteSuccess();}
+    else{failsRef.current++;setFails(failsRef.current);SFX.gameOver();}
     setTimeout(()=>{
-      qRef.current++;
-      if(qRef.current>=QS)finishExam();
-      else{setQNo(qRef.current);nextTask();}
-    },900);
+      if(!ok&&failsRef.current>=MAX_FAILS){onFail("시험을 5번이나 망쳐서 만화책을 다 못 모았다!\n좋은 점수를 받아야 한 권씩 사준대!");return;}
+      advance();
+    },1400);
   };
 
   // 미니게임별 진행(50ms 틱)
   useEffect(()=>{
     if(phase!=="exam"||!task)return;
-    const limit=EXAM_TASKS[task.type].limit;
     let elapsed=0,showElapsed=0;
     const i=setInterval(()=>{
       if(lockRef.current)return;
       if(task.type==="memory"&&showRef.current){
         showElapsed+=50;
-        if(showElapsed>=SHOW_MS){showRef.current=false;setShown(false);}
+        if(showElapsed>=task.showMs){showRef.current=false;setShown(false);}
         return;
       }
-      elapsed+=50;setTimeBar(Math.max(0,100-elapsed/limit*100));
+      elapsed+=50;setTimeBar(Math.max(0,100-elapsed/task.limit*100));
       if(task.type==="omr"){
-        let np=markerRef.current+dirRef.current*3.4;
+        let np=markerRef.current+dirRef.current*task.speed;
         if(np>=100){np=100;dirRef.current=-1;}
         if(np<=0){np=0;dirRef.current=1;}
         markerRef.current=np;setMarker(np);
       }
       if(task.type==="sleepy"){
-        lidRef.current=Math.min(100,lidRef.current+1.8);setLid(lidRef.current);
+        lidRef.current=Math.min(100,lidRef.current+task.rate);setLid(lidRef.current);
         if(lidRef.current>=100){resolve(false,"😴 잠들어 버렸다!");return;}
-        if(elapsed>=limit){resolve(true,"😎 졸음을 이겼다!");return;}
+        if(elapsed>=task.limit){resolve(true,"😎 졸음을 이겼다!");return;}
         return;
       }
-      if(elapsed>=limit)resolve(false,"⏰ 시간 초과!");
+      if(elapsed>=task.limit)resolve(false,"⏰ 시간 초과!");
     },50);
     return ()=>clearInterval(i);
   },[phase,task]);
@@ -1002,31 +1011,11 @@ function Level6({onClear,onFail}) {
     }else SFX.alert();
   };
 
-  const newExam=()=>{
-    qRef.current=0;correctRef.current=0;startExamTasks();
-    setExamNo(n=>n+1);setQNo(0);setMarks([]);setGrade(null);
-    phaseRef.current="exam";setPhase("exam");nextTask();
-  };
-
-  const finishExam=()=>{
-    const score=Math.round(correctRef.current/QS*100);
-    const pass=correctRef.current>=PASS;
-    const lines=pass?PASS_LINES:FAIL_LINES;
-    setGrade({score,pass,line:lines[Math.floor(Math.random()*lines.length)]});
-    phaseRef.current="grade";setPhase("grade");
-    if(pass){volsRef.current=[...volsRef.current,"exam"];setVols(volsRef.current);SFX.muteSuccess();}
-    else{failsRef.current++;setFails(failsRef.current);SFX.gameOver();}
-    setTimeout(()=>{
-      if(!pass&&failsRef.current>=MAX_FAILS){onFail("시험을 3번이나 망쳐서 만화책을 못 샀다!\n좋은 점수를 받아야 한 권씩 사준대!");return;}
-      if(volsRef.current.length>=EXAM_VOLS)startBirthday(0);
-      else newExam();
-    },2300);
-  };
-
   // 생일 케이크 촛불 불기
-  const startBirthday=(i)=>{
-    bdayRef.current=i;tapsRef.current=0;doneRef.current=false;
-    setBday(i);setTaps(0);setBBar(100);setGifted(false);
+  const startBirthday=()=>{
+    needRef.current=birthNeed(Math.floor(volsRef.current.length/3));
+    tapsRef.current=0;doneRef.current=false;
+    setTaps(0);setBBar(100);setGifted(false);setFeedback("");setMomLine("");
     phaseRef.current="birthday";setPhase("birthday");
   };
   useEffect(()=>{
@@ -1038,25 +1027,22 @@ function Level6({onClear,onFail}) {
       if(elapsed>=BIRTH_TIME){doneRef.current=true;SFX.gameOver();onFail("촛불을 다 못 꺼서 소원이 날아갔다!\n생일 선물을 받으려면 촛불을 후~ 불어야 해!");}
     },50);
     return ()=>clearInterval(i);
-  },[phase,bday]);
+  },[phase]);
   const blow=()=>{
     if(phaseRef.current!=="birthday"||doneRef.current)return;
     tapsRef.current++;setTaps(tapsRef.current);SFX.hideTap();
-    if(tapsRef.current>=BIRTH_TAPS[bdayRef.current]){
+    if(tapsRef.current>=needRef.current){
       doneRef.current=true;setGifted(true);
       volsRef.current=[...volsRef.current,"gift"];setVols(volsRef.current);SFX.muteSuccess();
-      setTimeout(()=>{
-        if(bdayRef.current<2)startBirthday(bdayRef.current+1);
-        else{phaseRef.current="done";setPhase("done");SFX.fanfare();setTimeout(()=>onClear(),1800);}
-      },1600);
+      setTimeout(()=>advance(),1200);
     }
   };
 
   const slot=(k)=>{
     const v=vols[k];
-    return e('div',{key:k,style:{width:44,height:62,borderRadius:4,border:v?'2px solid #000':'2px dashed rgba(255,255,255,0.25)',background:v==="exam"?'linear-gradient(180deg,#d9453b,#8e1f1a)':v==="gift"?'linear-gradient(180deg,#ffcc00,#cc8800)':'rgba(255,255,255,0.04)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,boxShadow:v?'2px 2px 0 #000':'none',animation:v&&k===vols.length-1?'float 0.6s ease-in-out 2':'none'}},
-      e('span',{style:{fontFamily:PF,fontSize:7,color:v?'#fff':'rgba(255,255,255,0.3)'}},`${k+1}권`),
-      e('span',{style:{fontSize:14}},v==="gift"?'🎁':v==="exam"?'💯':'')
+    return e('div',{key:k,style:{width:40,height:30,borderRadius:3,border:v?'2px solid #000':'1px dashed rgba(255,255,255,0.22)',background:v==="exam"?'linear-gradient(180deg,#d9453b,#8e1f1a)':v==="gift"?'linear-gradient(180deg,#ffcc00,#cc8800)':'rgba(255,255,255,0.04)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxShadow:v?'1px 1px 0 #000':'none',animation:v&&k===vols.length-1?'float 0.5s ease-in-out 2':'none'}},
+      e('span',{style:{fontFamily:PF,fontSize:6,color:v?'#fff':'rgba(255,255,255,0.3)'}},k+1),
+      e('span',{style:{fontSize:8,lineHeight:1}},v==="gift"?'🎁':v==="exam"?'💯':'')
     );
   };
   const bigBtn=(label,onClick,extra)=>e('button',{onClick,style:Object.assign({width:'100%',fontFamily:PF,fontSize:11,padding:'14px 8px',background:'linear-gradient(135deg,#3b2a66,#2a1d4d)',color:C.white,border:'2px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'2px 2px 0 #000'},extra||{})},label);
@@ -1067,10 +1053,10 @@ function Level6({onClear,onFail}) {
     if(task.type==="memory"){
       if(shown)return e('div',{'data-seq':task.seq.join(''),style:{display:'flex',flexDirection:'column',alignItems:'center',gap:10,height:150,justifyContent:'center'}},
         e('div',{style:{fontFamily:PF,fontSize:9,color:C.accent,animation:'pulse 0.4s infinite'}},'외워라!'),
-        e('div',{style:{display:'flex',gap:14,fontSize:40}},...task.seq.map((s,k)=>e('span',{key:k},s)))
+        e('div',{style:{display:'flex',gap:10,fontSize:task.seq.length>4?30:38}},...task.seq.map((s,k)=>e('span',{key:k},s)))
       );
       return e('div',{style:{display:'flex',flexDirection:'column',alignItems:'center',gap:12,height:150}},
-        e('div',{style:{display:'flex',gap:10,fontSize:22,height:30}},...task.seq.map((s,k)=>e('span',{key:k},k<step?s:'❔'))),
+        e('div',{style:{display:'flex',gap:8,fontSize:20,height:30}},...task.seq.map((s,k)=>e('span',{key:k},k<step?s:'❔'))),
         e('div',{style:{display:'flex',gap:10,width:'100%'}},...task.choices.map((c)=>e('button',{key:c,'data-icon':c,onClick:()=>pressMemory(c),style:{flex:1,fontSize:30,padding:'12px 0',background:'linear-gradient(135deg,#3b2a66,#2a1d4d)',border:'2px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'2px 2px 0 #000'}},c)))
       );
     }
@@ -1095,27 +1081,26 @@ function Level6({onClear,onFail}) {
     );
   };
 
-  const bNeed=BIRTH_TAPS[Math.min(bday,2)];
-  const candlesLeft=Math.max(0,bNeed-taps);
-  const wishVol=EXAM_VOLS+bday+1;
+  const nextWish=vols.length+1;
+  const candlesLeft=Math.max(0,needRef.current-taps);
+  const failedMsg=feedback.startsWith('❌')||feedback.startsWith('⏰')||feedback.startsWith('😴');
 
   return e('div',{style:{width:'100%',height:'100%',background:'linear-gradient(180deg,#1b1030 0%,#2b1b4a 55%,#3a2560 100%)',position:'relative',overflow:'hidden',userSelect:'none',cursor:phase==="birthday"?'pointer':'default'},onClick:phase==="birthday"?blow:undefined},
     e('div',{style:{position:'absolute',top:8,left:10,right:10,fontFamily:PF,fontSize:8,color:C.accent,zIndex:15,display:'flex',justifyContent:'space-between'}},
       e('span',null,'LEVEL 6: 겨리의 책장'),e('span',null,`📕 주술회전 ${vols.length}/${TOTAL}`)
     ),
-    // 책장
-    e('div',{style:{position:'absolute',top:34,left:0,right:0,display:'flex',justifyContent:'center',gap:4,padding:'8px 0',borderBottom:'6px solid #5a4a3a',background:'rgba(0,0,0,0.25)'}},
+    // 책장 (30권)
+    e('div',{style:{position:'absolute',top:28,left:0,right:0,display:'flex',flexWrap:'wrap',justifyContent:'center',gap:3,padding:'6px 22px',borderBottom:'6px solid #5a4a3a',background:'rgba(0,0,0,0.25)'}},
       ...Array.from({length:TOTAL}).map((_,k)=>slot(k))
     ),
-    e('div',{style:{position:'absolute',top:122,left:0,right:0,textAlign:'center',fontFamily:PF,fontSize:6,color:'rgba(255,255,255,0.55)',lineHeight:1.9}},'💯 시험 점수 좋으면 한 권씩 (6권)  ·  🎁 생일 선물 (3권)'),
+    e('div',{style:{position:'absolute',top:140,left:0,right:0,textAlign:'center',fontFamily:PF,fontSize:6,color:'rgba(255,255,255,0.55)',lineHeight:1.9}},'💯 시험 성공하면 한 권씩 (20권)  ·  🎁 생일 선물 (10권)'),
 
-    // ── 시험 (미니게임 3종) ──
-    phase==="exam"&&task?e('div',{style:{position:'absolute',top:150,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:8}},
+    // ── 시험 (미니게임 1판 = 책 1권) ──
+    phase==="exam"&&task?e('div',{style:{position:'absolute',top:166,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:8}},
       e('div',{style:{width:'100%',display:'flex',justifyContent:'space-between',fontFamily:PF,fontSize:8,color:C.white}},
-        e('span',null,`📝 ${examNo}번째 시험  ${qNo+1}/${QS}`),
-        e('span',{style:{color:fails>=2?C.danger:C.accent}},`실패 ${fails}/${MAX_FAILS}`)
+        e('span',null,`📝 ${examNo}번째 시험`),
+        e('span',{style:{color:fails>=MAX_FAILS-1?C.danger:C.accent}},`실패 ${fails}/${MAX_FAILS}`)
       ),
-      e('div',{style:{display:'flex',gap:8,fontSize:18,height:24}},...Array.from({length:QS}).map((_,k)=>e('span',{key:k},marks[k]==="o"?'⭕':marks[k]==="x"?'❌':'⬜'))),
       e('div',{style:{width:'100%',padding:'10px',background:'rgba(255,255,255,0.08)',border:'2px solid rgba(255,255,255,0.2)',borderRadius:8,textAlign:'center',lineHeight:1.9}},
         e('div',{style:{fontFamily:PF,fontSize:11,color:C.white}},EXAM_TASKS[task.type].name),
         e('div',{style:{fontFamily:PF,fontSize:7,color:'rgba(255,255,255,0.65)'}},EXAM_TASKS[task.type].hint)
@@ -1124,26 +1109,19 @@ function Level6({onClear,onFail}) {
         e('div',{style:{width:`${timeBar}%`,height:'100%',background:timeBar<30?C.danger:C.accent}})
       ),
       e('div',{style:{width:'100%'}},renderTask()),
-      e('div',{style:{fontFamily:PF,fontSize:9,height:14,color:feedback.startsWith('❌')||feedback.startsWith('⏰')||feedback.startsWith('😴')?C.danger:C.safe}},feedback)
-    ):null,
-
-    // ── 채점 ──
-    phase==="grade"&&grade?e('div',{style:{position:'absolute',top:170,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:14}},
-      e('div',{style:{fontSize:44}},grade.pass?'🎉':'😰'),
-      e('div',{style:{fontFamily:PF,fontSize:20,color:grade.pass?C.safe:C.danger,textShadow:'2px 2px 0 #000'}},`${grade.score}점`),
-      e('div',{style:{fontFamily:PF,fontSize:10,color:grade.pass?C.accent:C.danger}},grade.pass?`좋은 점수! 주술회전 ${vols.length}권 GET! 📕`:'아쉬운 점수... 이번엔 만화책 없음'),
-      e('div',{style:{fontFamily:PF,fontSize:8,color:C.mom,textAlign:'center',lineHeight:2.2}},grade.line)
+      e('div',{style:{fontFamily:PF,fontSize:10,height:14,color:failedMsg?C.danger:C.safe}},feedback),
+      e('div',{style:{fontFamily:PF,fontSize:7,height:14,color:C.mom,textAlign:'center'}},momLine)
     ):null,
 
     // ── 생일 ──
-    phase==="birthday"?e('div',{style:{position:'absolute',top:160,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:10}},
-      e('div',{style:{fontFamily:PF,fontSize:9,color:C.accent}},`🎂 ${bday+1}번째 생일`),
-      e('div',{style:{fontFamily:PF,fontSize:7,color:C.mom,textAlign:'center',lineHeight:2.1}},`엄마: "겨리야, 생일 선물 뭐 받고 싶니?"`,e('br'),e('span',{style:{color:C.kid}},`겨리: "주술회전 ${wishVol}권이요!!"`)),
-      e('div',{style:{fontSize:60,animation:gifted?'float 0.6s ease-in-out infinite':'none'}},gifted?'🎁':'🎂'),
-      e('div',{style:{fontSize:20,height:28,letterSpacing:2}},gifted?'':'🕯️'.repeat(candlesLeft)),
-      e('div',{style:{fontFamily:PF,fontSize:9,color:gifted?C.safe:C.white,animation:gifted?'none':'pulse 0.5s infinite'}},gifted?`🎁 주술회전 ${wishVol}권 선물 받음!`:'후~ 후~ 연타해서 촛불 끄기!'),
+    phase==="birthday"?e('div',{style:{position:'absolute',top:166,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:10}},
+      e('div',{style:{fontFamily:PF,fontSize:9,color:C.accent}},`🎂 ${Math.floor(vols.length/3)+(gifted?0:1)}번째 생일`),
+      e('div',{style:{fontFamily:PF,fontSize:7,color:C.mom,textAlign:'center',lineHeight:2.1}},`엄마: "겨리야, 생일 선물 뭐 받고 싶니?"`,e('br'),e('span',{style:{color:C.kid}},`겨리: "주술회전 ${gifted?vols.length:nextWish}권이요!!"`)),
+      e('div',{style:{fontSize:56,animation:gifted?'float 0.6s ease-in-out infinite':'none'}},gifted?'🎁':'🎂'),
+      e('div',{style:{fontSize:16,height:24,letterSpacing:1,textAlign:'center',lineHeight:1.2}},gifted?'':'🕯️'.repeat(candlesLeft)),
+      e('div',{style:{fontFamily:PF,fontSize:9,color:gifted?C.safe:C.white,animation:gifted?'none':'pulse 0.5s infinite'}},gifted?`🎁 주술회전 ${vols.length}권 선물 받음!`:'후~ 후~ 연타해서 촛불 끄기!'),
       e('div',{style:{width:'100%',height:14,background:'#222',border:'2px solid #555',borderRadius:4,overflow:'hidden'}},
-        e('div',{style:{width:`${Math.min(100,taps/bNeed*100)}%`,height:'100%',background:`linear-gradient(90deg,${C.accent},${C.safe})`,transition:'width 0.05s'}})
+        e('div',{style:{width:`${Math.min(100,taps/Math.max(1,needRef.current)*100)}%`,height:'100%',background:`linear-gradient(90deg,${C.accent},${C.safe})`,transition:'width 0.05s'}})
       ),
       e('div',{style:{width:'100%',height:6,background:'#222',borderRadius:3,overflow:'hidden'}},
         e('div',{style:{width:`${bBar}%`,height:'100%',background:bBar<30?C.danger:C.mom}})
@@ -1151,10 +1129,10 @@ function Level6({onClear,onFail}) {
     ):null,
 
     // ── 완성 ──
-    phase==="done"?e('div',{style:{position:'absolute',top:170,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:14}},
+    phase==="done"?e('div',{style:{position:'absolute',top:180,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:14}},
       e('div',{style:{fontSize:56,animation:'float 1s ease-in-out infinite'}},'📚'),
       e('div',{style:{fontFamily:PF,fontSize:13,color:C.accent,textShadow:'2px 2px 0 #000'}},'책장 완성!'),
-      e('div',{style:{fontFamily:PF,fontSize:8,color:C.white,textAlign:'center',lineHeight:2.2}},'주술회전 9권 전권 수집 성공!',e('br'),e('span',{style:{color:C.mom}},'엄마: "...이제 공부도 열심히 하자?"'))
+      e('div',{style:{fontFamily:PF,fontSize:8,color:C.white,textAlign:'center',lineHeight:2.2}},'주술회전 30권 전권 수집 성공!',e('br'),e('span',{style:{color:C.mom}},'엄마: "...이제 공부도 열심히 하자?"'))
     ):null
   );
 }
@@ -1182,7 +1160,7 @@ const levelData=[
   {title:"스몸비 챌린지",desc:"위쪽 탭 = 장애물 점프!\n아래쪽 폰 탭 = 게임 진행!\n게이지는 계속 줄어들어, 도착 전 50% 이상!\n아줌마를 조심해!",emoji:"🛹"},
   {title:"완벽한 알리바이",desc:"발소리가 들리면 탭해서 폰 숨기기!\n엄마 검사 중엔 절대 터치 금지!\n3라운드 버티면 성공!",emoji:"📚"},
   {title:"한밤의 라면 작전",desc:"엄마 잠든 새벽, 몰래 라면 끓이기!\n흰 선이 초록 구간에 올 때 탭!\n실수 3번이면 엄마가 깬다!",emoji:"🍜"},
-  {title:"주술회전 책장 채우기",desc:"시험은 미니게임 3종 세트! 2개 이상 성공하면 한 권씩! (6권)\n생일엔 촛불을 불고 선물로 3권!\n총 9권 완성! (시험 3번 망치면 실패)",emoji:"📕"},
+  {title:"주술회전 책장 채우기",desc:"시험 미니게임에 성공하면 엄마가 한 권씩! (20권)\n시험 2번마다 생일! 촛불을 불고 선물로 한 권! (10권)\n주술회전 30권 완성! (시험 5번 망치면 실패)",emoji:"📕"},
 ];
 const momLines=[
   ['엄마: "겨리 너 지금 폰 만졌니?!"','엄마: "한밤중에 뭐 하는 거야!"','엄마: "그 폰 이리 내놔!"'],
