@@ -271,12 +271,12 @@ function LevelIntro({level,title,desc,emoji,onStart}) {
 
 // ─── LEVEL CLEAR ───
 function LevelClear({level,onNext}) {
-  const msgs=["겨리 스마트폰 획득! 🎉","겨리 아이스크림 GET! 🍦","겨리 무사히 탈출! 🏃","겨리 완벽한 알리바이! 😎","겨리 야식 라면 완성! 🍜"];
+  const msgs=["겨리 스마트폰 획득! 🎉","겨리 아이스크림 GET! 🍦","겨리 무사히 탈출! 🏃","겨리 완벽한 알리바이! 😎","겨리 야식 라면 완성! 🍜","겨리 주술회전 9권 책장 완성! 📚"];
   return e('div',{style:{width:'100%',height:'100%',background:`radial-gradient(circle at 50% 40%,#1a3a2a,${C.bg})`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:16}},
     e('div',{style:{fontSize:60,animation:'float 1s ease-in-out infinite'}},'⭐'),
     e('div',{style:{fontFamily:PF,fontSize:13,color:C.safe,textShadow:'2px 2px 0 #000'}},'STAGE CLEAR!'),
     e('div',{style:{fontFamily:PF,fontSize:9,color:C.accent,textShadow:'1px 1px 0 #000'}},msgs[level-1]),
-    e('button',{onClick:()=>{SFX.click();onNext();},style:{marginTop:20,fontFamily:PF,fontSize:10,padding:'12px 32px',background:`linear-gradient(135deg,${C.accent},#ff9900)`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'3px 3px 0 #000'}},level<5?'다음 스테이지 →':'엔딩 보기')
+    e('button',{onClick:()=>{SFX.click();onNext();},style:{marginTop:20,fontFamily:PF,fontSize:10,padding:'12px 32px',background:`linear-gradient(135deg,${C.accent},#ff9900)`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'3px 3px 0 #000'}},level<6?'다음 스테이지 →':'엔딩 보기')
   );
 }
 
@@ -871,6 +871,222 @@ function Level5({onClear,onFail}) {
   );
 }
 
+// ═══════════════════════════════════════
+// LEVEL 6: 겨리의 책장 - 주술회전 전권 모으기
+//  · 시험 점수가 좋으면 한 권씩 (9권 중 6권 = 2/3)
+//  · 나머지 3권(1/3)은 생일 선물
+// ═══════════════════════════════════════
+const EXAM_QUESTIONS=[
+  {t:"우리나라의 수도는?",c:["서울","부산","대전"]},
+  {t:"물이 얼면 무엇이 될까?",c:["얼음","수증기","구름"]},
+  {t:"태양계에서 가장 큰 행성은?",c:["목성","지구","화성"]},
+  {t:"한글을 만든 왕은?",c:["세종대왕","이순신","광개토대왕"]},
+  {t:"1년은 몇 개월일까?",c:["12개월","10개월","14개월"]},
+  {t:"지구 주위를 도는 위성은?",c:["달","화성","금성"]},
+  {t:"삼각형의 변은 몇 개?",c:["3개","4개","5개"]},
+  {t:"무지개는 몇 가지 색일까?",c:["7가지","5가지","9가지"]},
+  {t:"식물이 광합성에 꼭 필요한 것은?",c:["햇빛","모래","소금"]},
+  {t:"고래는 어떤 동물일까?",c:["포유류","어류","파충류"]},
+  {t:"영어로 사과는?",c:["apple","orange","grape"]},
+  {t:"3월 1일은 무슨 날?",c:["삼일절","어린이날","한글날"]},
+  {t:"5월 5일은 무슨 날?",c:["어린이날","광복절","개천절"]},
+  {t:"육상에서 가장 빠른 동물은?",c:["치타","사자","말"]},
+  {t:"직각은 몇 도일까?",c:["90도","180도","45도"]},
+  {t:"1시간은 몇 분?",c:["60분","100분","30분"]},
+  {t:"물이 끓는 온도는? (1기압)",c:["100도","50도","0도"]},
+  {t:"세계에서 가장 높은 산은?",c:["에베레스트","한라산","백두산"]},
+];
+function shuffleArr(a){const r=a.slice();for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]];}return r;}
+function makeMathQuestion(){
+  const a=2+Math.floor(Math.random()*8),b=2+Math.floor(Math.random()*8),ans=a*b;
+  const wrong=new Set();
+  [ans+a,ans-a,ans+b,ans-b,ans+1,ans-1,ans+10].forEach(v=>{if(v>0&&v!==ans)wrong.add(v);});
+  const picks=shuffleArr([...wrong]).slice(0,2);
+  const choices=shuffleArr([ans,...picks]);
+  return {t:`${a} × ${b} = ?`,choices:choices.map(String),answer:choices.indexOf(ans)};
+}
+function makeStaticQuestion(usedSet){
+  let pool=EXAM_QUESTIONS.map((q,i)=>i).filter(i=>!usedSet.has(i));
+  if(pool.length===0){usedSet.clear();pool=EXAM_QUESTIONS.map((q,i)=>i);}
+  const idx=pool[Math.floor(Math.random()*pool.length)];usedSet.add(idx);
+  const q=EXAM_QUESTIONS[idx];
+  const choices=shuffleArr(q.c);
+  return {t:q.t,choices,answer:choices.indexOf(q.c[0])};
+}
+const PASS_LINES=['엄마: "오~ 점수 좋네! 약속대로 한 권 사줄게."','엄마: "열심히 했구나. 이번 달 만화책은 여기!"','엄마: "이 점수면 인정! 다음 권도 기대할게."'];
+const FAIL_LINES=['엄마: "이 점수로 만화책? 안 돼!"','엄마: "다음 시험 잘 보면 생각해 볼게."','엄마: "공부는 안 하고 만화책 생각만 했지?"'];
+
+function Level6({onClear,onFail}) {
+  const TOTAL=9,EXAM_VOLS=6,QS=3,PASS=2,MAX_FAILS=3,QTIME=6000,BIRTH_TAPS=[10,14,18],BIRTH_TIME=5000;
+  const [phase,setPhase]=useState("exam");
+  const [vols,setVols]=useState([]);
+  const [fails,setFails]=useState(0);
+  const [examNo,setExamNo]=useState(1);
+  const [qNo,setQNo]=useState(0);
+  const [question,setQuestion]=useState(null);
+  const [timeBar,setTimeBar]=useState(100);
+  const [marks,setMarks]=useState([]);
+  const [grade,setGrade]=useState(null);
+  const [feedback,setFeedback]=useState("");
+  const [bday,setBday]=useState(0);
+  const [taps,setTaps]=useState(0);
+  const [bBar,setBBar]=useState(100);
+  const [gifted,setGifted]=useState(false);
+  const phaseRef=useRef("exam"),volsRef=useRef([]),failsRef=useRef(0),qRef=useRef(0),correctRef=useRef(0);
+  const lockRef=useRef(false),usedRef=useRef(new Set()),tapsRef=useRef(0),bdayRef=useRef(0),doneRef=useRef(false);
+  const questionRef=useRef(null);
+
+  const nextQuestion=()=>{
+    const q=qRef.current===0?makeMathQuestion():makeStaticQuestion(usedRef.current);
+    questionRef.current=q;lockRef.current=false;setQuestion(q);setTimeBar(100);setFeedback("");
+  };
+  useEffect(()=>{nextQuestion();},[]);
+
+  const answer=(idx)=>{
+    if(lockRef.current||phaseRef.current!=="exam")return;
+    lockRef.current=true;
+    const ok=idx===questionRef.current.answer;
+    if(ok){correctRef.current++;SFX.phoneTap();}else SFX.alert();
+    setMarks(m=>[...m,ok?"o":"x"]);
+    setFeedback(ok?"⭕ 정답!":idx<0?"⏰ 시간 초과!":"❌ 오답!");
+    setTimeout(()=>{
+      qRef.current++;
+      if(qRef.current>=QS)finishExam();
+      else{setQNo(qRef.current);nextQuestion();}
+    },700);
+  };
+
+  // 문제별 제한시간
+  useEffect(()=>{
+    if(phase!=="exam"||!question)return;
+    let elapsed=0;
+    const i=setInterval(()=>{
+      if(lockRef.current)return;
+      elapsed+=50;setTimeBar(Math.max(0,100-elapsed/QTIME*100));
+      if(elapsed>=QTIME)answer(-1);
+    },50);
+    return ()=>clearInterval(i);
+  },[phase,question]);
+
+  const newExam=()=>{
+    qRef.current=0;correctRef.current=0;
+    setExamNo(n=>n+1);setQNo(0);setMarks([]);setGrade(null);
+    phaseRef.current="exam";setPhase("exam");nextQuestion();
+  };
+
+  const finishExam=()=>{
+    const score=Math.round(correctRef.current/QS*100);
+    const pass=correctRef.current>=PASS;
+    const lines=pass?PASS_LINES:FAIL_LINES;
+    setGrade({score,pass,line:lines[Math.floor(Math.random()*lines.length)]});
+    phaseRef.current="grade";setPhase("grade");
+    if(pass){volsRef.current=[...volsRef.current,"exam"];setVols(volsRef.current);SFX.muteSuccess();}
+    else{failsRef.current++;setFails(failsRef.current);SFX.gameOver();}
+    setTimeout(()=>{
+      if(!pass&&failsRef.current>=MAX_FAILS){onFail("시험을 3번이나 망쳐서 만화책을 못 샀다!\n좋은 점수를 받아야 한 권씩 사준대!");return;}
+      if(volsRef.current.length>=EXAM_VOLS)startBirthday(0);
+      else newExam();
+    },2300);
+  };
+
+  // 생일 케이크 촛불 불기
+  const startBirthday=(i)=>{
+    bdayRef.current=i;tapsRef.current=0;doneRef.current=false;
+    setBday(i);setTaps(0);setBBar(100);setGifted(false);
+    phaseRef.current="birthday";setPhase("birthday");
+  };
+  useEffect(()=>{
+    if(phase!=="birthday")return;
+    let elapsed=0;
+    const i=setInterval(()=>{
+      if(doneRef.current)return;
+      elapsed+=50;setBBar(Math.max(0,100-elapsed/BIRTH_TIME*100));
+      if(elapsed>=BIRTH_TIME){doneRef.current=true;SFX.gameOver();onFail("촛불을 다 못 꺼서 소원이 날아갔다!\n생일 선물을 받으려면 촛불을 후~ 불어야 해!");}
+    },50);
+    return ()=>clearInterval(i);
+  },[phase,bday]);
+  const blow=()=>{
+    if(phaseRef.current!=="birthday"||doneRef.current)return;
+    tapsRef.current++;setTaps(tapsRef.current);SFX.hideTap();
+    if(tapsRef.current>=BIRTH_TAPS[bdayRef.current]){
+      doneRef.current=true;setGifted(true);
+      volsRef.current=[...volsRef.current,"gift"];setVols(volsRef.current);SFX.muteSuccess();
+      setTimeout(()=>{
+        if(bdayRef.current<2)startBirthday(bdayRef.current+1);
+        else{phaseRef.current="done";setPhase("done");SFX.fanfare();setTimeout(()=>onClear(),1800);}
+      },1600);
+    }
+  };
+
+  const slot=(k)=>{
+    const v=vols[k];
+    return e('div',{key:k,style:{width:44,height:62,borderRadius:4,border:v?'2px solid #000':'2px dashed rgba(255,255,255,0.25)',background:v==="exam"?'linear-gradient(180deg,#d9453b,#8e1f1a)':v==="gift"?'linear-gradient(180deg,#ffcc00,#cc8800)':'rgba(255,255,255,0.04)',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:2,boxShadow:v?'2px 2px 0 #000':'none',animation:v&&k===vols.length-1?'float 0.6s ease-in-out 2':'none'}},
+      e('span',{style:{fontFamily:PF,fontSize:7,color:v?'#fff':'rgba(255,255,255,0.3)'}},`${k+1}권`),
+      e('span',{style:{fontSize:14}},v==="gift"?'🎁':v==="exam"?'💯':'')
+    );
+  };
+
+  const bNeed=BIRTH_TAPS[Math.min(bday,2)];
+  const candlesLeft=Math.max(0,bNeed-taps);
+  const wishVol=EXAM_VOLS+bday+1;
+
+  return e('div',{style:{width:'100%',height:'100%',background:'linear-gradient(180deg,#1b1030 0%,#2b1b4a 55%,#3a2560 100%)',position:'relative',overflow:'hidden',userSelect:'none',cursor:phase==="birthday"?'pointer':'default'},onClick:phase==="birthday"?blow:undefined},
+    e('div',{style:{position:'absolute',top:8,left:10,right:10,fontFamily:PF,fontSize:8,color:C.accent,zIndex:15,display:'flex',justifyContent:'space-between'}},
+      e('span',null,'LEVEL 6: 겨리의 책장'),e('span',null,`📕 주술회전 ${vols.length}/${TOTAL}`)
+    ),
+    // 책장
+    e('div',{style:{position:'absolute',top:34,left:0,right:0,display:'flex',justifyContent:'center',gap:4,padding:'8px 0',borderBottom:'6px solid #5a4a3a',background:'rgba(0,0,0,0.25)'}},
+      ...Array.from({length:TOTAL}).map((_,k)=>slot(k))
+    ),
+    e('div',{style:{position:'absolute',top:122,left:0,right:0,textAlign:'center',fontFamily:PF,fontSize:6,color:'rgba(255,255,255,0.55)',lineHeight:1.9}},'💯 시험 점수 좋으면 한 권씩 (6권)  ·  🎁 생일 선물 (3권)'),
+
+    // ── 시험 ──
+    phase==="exam"&&question?e('div',{style:{position:'absolute',top:160,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:10}},
+      e('div',{style:{width:'100%',display:'flex',justifyContent:'space-between',fontFamily:PF,fontSize:8,color:C.white}},
+        e('span',null,`📝 ${examNo}번째 시험  ${qNo+1}/${QS}`),
+        e('span',{style:{color:fails>=2?C.danger:C.accent}},`실패 ${fails}/${MAX_FAILS}`)
+      ),
+      e('div',{style:{display:'flex',gap:8,fontSize:18,height:24}},...Array.from({length:QS}).map((_,k)=>e('span',{key:k},marks[k]==="o"?'⭕':marks[k]==="x"?'❌':'⬜'))),
+      e('div',{style:{width:'100%',padding:'16px 10px',background:'rgba(255,255,255,0.08)',border:'2px solid rgba(255,255,255,0.2)',borderRadius:8,textAlign:'center',fontFamily:PF,fontSize:11,lineHeight:1.8,color:C.white,minHeight:56,display:'flex',alignItems:'center',justifyContent:'center'}},question.t),
+      e('div',{style:{width:'100%',height:8,background:'#222',border:'1px solid #444',borderRadius:3,overflow:'hidden'}},
+        e('div',{style:{width:`${timeBar}%`,height:'100%',background:timeBar<30?C.danger:C.accent}})
+      ),
+      ...question.choices.map((c,k)=>e('button',{key:k,'data-ans':k===question.answer?'1':'0',disabled:lockRef.current,onClick:()=>answer(k),style:{width:'100%',fontFamily:PF,fontSize:10,padding:'12px 8px',background:'linear-gradient(135deg,#3b2a66,#2a1d4d)',color:C.white,border:'2px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'2px 2px 0 #000'}},`${k+1}. ${c}`)),
+      e('div',{style:{fontFamily:PF,fontSize:9,height:14,color:feedback.startsWith('⭕')?C.safe:C.danger}},feedback)
+    ):null,
+
+    // ── 채점 ──
+    phase==="grade"&&grade?e('div',{style:{position:'absolute',top:170,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:14}},
+      e('div',{style:{fontSize:44}},grade.pass?'🎉':'😰'),
+      e('div',{style:{fontFamily:PF,fontSize:20,color:grade.pass?C.safe:C.danger,textShadow:'2px 2px 0 #000'}},`${grade.score}점`),
+      e('div',{style:{fontFamily:PF,fontSize:10,color:grade.pass?C.accent:C.danger}},grade.pass?`좋은 점수! 주술회전 ${vols.length}권 GET! 📕`:'아쉬운 점수... 이번엔 만화책 없음'),
+      e('div',{style:{fontFamily:PF,fontSize:8,color:C.mom,textAlign:'center',lineHeight:2.2}},grade.line)
+    ):null,
+
+    // ── 생일 ──
+    phase==="birthday"?e('div',{style:{position:'absolute',top:160,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:10}},
+      e('div',{style:{fontFamily:PF,fontSize:9,color:C.accent}},`🎂 ${bday+1}번째 생일`),
+      e('div',{style:{fontFamily:PF,fontSize:7,color:C.mom,textAlign:'center',lineHeight:2.1}},`엄마: "겨리야, 생일 선물 뭐 받고 싶니?"`,e('br'),e('span',{style:{color:C.kid}},`겨리: "주술회전 ${wishVol}권이요!!"`)),
+      e('div',{style:{fontSize:60,animation:gifted?'float 0.6s ease-in-out infinite':'none'}},gifted?'🎁':'🎂'),
+      e('div',{style:{fontSize:20,height:28,letterSpacing:2}},gifted?'':'🕯️'.repeat(candlesLeft)),
+      e('div',{style:{fontFamily:PF,fontSize:9,color:gifted?C.safe:C.white,animation:gifted?'none':'pulse 0.5s infinite'}},gifted?`🎁 주술회전 ${wishVol}권 선물 받음!`:'후~ 후~ 연타해서 촛불 끄기!'),
+      e('div',{style:{width:'100%',height:14,background:'#222',border:'2px solid #555',borderRadius:4,overflow:'hidden'}},
+        e('div',{style:{width:`${Math.min(100,taps/bNeed*100)}%`,height:'100%',background:`linear-gradient(90deg,${C.accent},${C.safe})`,transition:'width 0.05s'}})
+      ),
+      e('div',{style:{width:'100%',height:6,background:'#222',borderRadius:3,overflow:'hidden'}},
+        e('div',{style:{width:`${bBar}%`,height:'100%',background:bBar<30?C.danger:C.mom}})
+      )
+    ):null,
+
+    // ── 완성 ──
+    phase==="done"?e('div',{style:{position:'absolute',top:170,left:20,right:20,display:'flex',flexDirection:'column',alignItems:'center',gap:14}},
+      e('div',{style:{fontSize:56,animation:'float 1s ease-in-out infinite'}},'📚'),
+      e('div',{style:{fontFamily:PF,fontSize:13,color:C.accent,textShadow:'2px 2px 0 #000'}},'책장 완성!'),
+      e('div',{style:{fontFamily:PF,fontSize:8,color:C.white,textAlign:'center',lineHeight:2.2}},'주술회전 9권 전권 수집 성공!',e('br'),e('span',{style:{color:C.mom}},'엄마: "...이제 공부도 열심히 하자?"'))
+    ):null
+  );
+}
+
 // ─── ENDING ───
 function Ending({onRestart,fails}) {
   return e('div',{style:{width:'100%',height:'100%',background:`radial-gradient(ellipse at 50% 30%,#2a2050,${C.bg})`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:14,padding:30}},
@@ -880,20 +1096,21 @@ function Ending({onRestart,fails}) {
       '겨리가 엄마의 잔소리를 뚫고',e('br'),'자유를 쟁취했다!',e('br'),
       e('span',{style:{color:C.mom}},'...내일도 잔소리는 계속된다 😅')
     ),
-    e('div',{style:{display:'flex',gap:12,marginTop:12,fontSize:28}},...['📱','🍦','🛹','📖','🍜','⭐'].map((s,i)=>e('span',{key:i},s))),
+    e('div',{style:{display:'flex',gap:12,marginTop:12,fontSize:28}},...['📱','🍦','🛹','📖','🍜','📕','⭐'].map((s,i)=>e('span',{key:i},s))),
     e('div',{style:{fontFamily:PF,fontSize:7,color:'rgba(255,255,255,0.6)',marginTop:12}},fails>0?`이번 판에 들킨 횟수: ${fails}번 😱`:'한 번도 안 들켰다! 🥷 완벽!'),
     e('button',{onClick:()=>{SFX.click();onRestart();},style:{marginTop:16,fontFamily:PF,fontSize:10,padding:'12px 32px',background:`linear-gradient(135deg,${C.accent},#ff9900)`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'3px 3px 0 #000'}},'처음부터 다시!')
   );
 }
 
 // ─── MAIN ───
-const LAST_LEVEL=5;
+const LAST_LEVEL=6;
 const levelData=[
   {title:"스마트폰 서리 작전",desc:"엄마가 코 골 때만 움직여!\n폰을 집으면 카톡 알림이... 무음 버튼 연타!",emoji:"📱"},
   {title:"아이스크림 닌자",desc:"엄마의 부채꼴 시야를 피해 냉장고로!\n엄마가 설거지할 때가 기회!\n소음이 높으면 손을 떼고 쉬었다 열어!",emoji:"🍦"},
   {title:"스몸비 챌린지",desc:"위쪽 탭 = 장애물 점프!\n아래쪽 폰 탭 = 게임 진행!\n게이지는 계속 줄어들어, 도착 전 50% 이상!\n아줌마를 조심해!",emoji:"🛹"},
   {title:"완벽한 알리바이",desc:"발소리가 들리면 탭해서 폰 숨기기!\n엄마 검사 중엔 절대 터치 금지!\n3라운드 버티면 성공!",emoji:"📚"},
   {title:"한밤의 라면 작전",desc:"엄마 잠든 새벽, 몰래 라면 끓이기!\n흰 선이 초록 구간에 올 때 탭!\n실수 3번이면 엄마가 깬다!",emoji:"🍜"},
+  {title:"주술회전 책장 채우기",desc:"시험 점수가 좋으면 엄마가 한 권씩! (6권)\n생일엔 촛불을 불고 선물로 3권!\n총 9권 완성! (시험 3번 망치면 실패)",emoji:"📕"},
 ];
 const momLines=[
   ['엄마: "겨리 너 지금 폰 만졌니?!"','엄마: "한밤중에 뭐 하는 거야!"','엄마: "그 폰 이리 내놔!"'],
@@ -901,8 +1118,9 @@ const momLines=[
   ['엄마: "걸으면서 폰 보지 말랬지!!"','엄마: "겨리 너 이리 와봐!!!"','엄마: "앞을 보고 걸어야지!"'],
   ['엄마: "공부한다더니 이게 뭐니?!"','엄마: "겨리 너 숙제는 했니?!"','엄마: "폰 이리 내!"'],
   ['엄마: "이 밤에 웬 라면 냄새야?!"','엄마: "겨리 너 야식 먹니?!"','엄마: "엄마도 한 입만... 아니 안 돼!"'],
+  ['엄마: "만화책은 점수 좋을 때만이라고 했지?"','엄마: "생일 선물은 소원을 제대로 빌어야지!"','엄마: "겨리 너 공부는 언제 할래?"'],
 ];
-const Levels=[Level1,Level2,Level3,Level4,Level5];
+const Levels=[Level1,Level2,Level3,Level4,Level5,Level6];
 
 function Game() {
   const [screen,setScreen]=useState("title");
