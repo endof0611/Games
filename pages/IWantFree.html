@@ -637,7 +637,7 @@ function Level3({onClear,onFail}) {
       o.isDanger?e('div',{style:{fontFamily:PF,fontSize:5,color:C.mom,textAlign:'center',position:'absolute',bottom:-12,width:50,left:-10}},'엄마친구!'):null
     )),
     // Player
-    e('div',{style:{position:'absolute',left:55,bottom:GAME_H-playerY-200,fontSize:36,zIndex:10}},'🏃'),
+    e('div',{style:{position:'absolute',left:55,bottom:GAME_H-playerY-200,fontSize:36,zIndex:10,transform:'scaleX(-1)'}},'🏃'),   // 🏃 이모지는 기본이 왼쪽을 보므로 달리는 방향(오른쪽)에 맞춰 좌우 반전
     // Phone area
     e('div',{style:{position:'absolute',bottom:0,left:0,right:0,height:80,background:'linear-gradient(180deg,rgba(0,0,0,0.8),#111)',borderTop:'2px solid #444',display:'flex',alignItems:'center',justifyContent:'center',gap:16,zIndex:20}},
       e('div',{style:{fontFamily:PF,fontSize:7,color:C.accent}},'📱 폰게임 탭!'),
