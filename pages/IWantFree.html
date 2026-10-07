@@ -1368,12 +1368,22 @@ function Game() {
   const [stats,setStats]=useState(()=>Store.get('iwf_stats',{best:0,fails:0,clears:0}));
   const [runFails,setRunFails]=useState(0);
   const playing=useRef(false);
+  const frameRef=useRef(null);
+  const [scale,setScale]=useState(1);   // 480x600 논리 화면을 실제 프레임 크기에 맞추는 배율
   const levelRef=useRef(1);
   const statsRef=useRef(stats);
   levelRef.current=level;
 
   const saveStats=(fn)=>{const ns=fn(statsRef.current);statsRef.current=ns;setStats(ns);Store.set('iwf_stats',ns);};
 
+  useEffect(()=>{
+    const el=frameRef.current;if(!el)return;
+    const update=()=>setScale(el.clientWidth/GAME_W);
+    update();
+    if(typeof ResizeObserver==='undefined'){window.addEventListener('resize',update);return ()=>window.removeEventListener('resize',update);}
+    const ro=new ResizeObserver(update);ro.observe(el);
+    return ()=>ro.disconnect();
+  },[]);
   useEffect(()=>{SFX.setMuted(muted);Store.set('iwf_muted',muted);},[muted]);
   useEffect(()=>{if(paused)Clock.pause();else Clock.resume();},[paused]);
   useEffect(()=>{if(screen!=="play")setPaused(false);},[screen]);
@@ -1407,8 +1417,8 @@ function Game() {
   const btn=(label,onClick)=>e('button',{onClick,style:{fontFamily:PF,fontSize:8,padding:'8px 10px',background:C.bgLight,color:C.white,border:'2px solid #000',borderRadius:5,cursor:'pointer',boxShadow:'2px 2px 0 #000'}},label);
 
   return e('div',{className:'frame'},
-    e('div',{style:{width:'100%',aspectRatio:`${GAME_W}/${GAME_H}`,position:'relative',overflow:'hidden',borderRadius:12,boxShadow:'0 8px 40px rgba(0,0,0,0.5), 0 0 0 3px rgba(255,255,255,0.1)',fontFamily:'sans-serif'}},
-      e('div',{style:{width:'100%',height:'100%',position:'absolute',inset:0}},
+    e('div',{ref:frameRef,style:{width:'100%',aspectRatio:`${GAME_W}/${GAME_H}`,position:'relative',overflow:'hidden',borderRadius:12,boxShadow:'0 8px 40px rgba(0,0,0,0.5), 0 0 0 3px rgba(255,255,255,0.1)',fontFamily:'sans-serif'}},
+      e('div',{style:{width:GAME_W,height:GAME_H,position:'absolute',top:0,left:0,transformOrigin:'0 0',transform:`scale(${scale})`}},
         screen==="title"?e(TitleScreen,{onStart:startGame,stats}):null,
         screen==="intro"?e(LevelIntro,{level,title:levelData[level-1].title,desc:levelData[level-1].desc,emoji:levelData[level-1].emoji,onStart:startLevel}):null,
         screen==="play"?e(LevelComp,{key:key,onClear,onFail}):null,
