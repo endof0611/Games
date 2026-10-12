@@ -575,6 +575,10 @@
             const playerInputs = document.getElementById('playerInputs');
             if (playerInputs.children.length > 1) {
                 button.parentElement.remove();
+                // 삭제 후 placeholder 번호 다시 매기기
+                playerInputs.querySelectorAll('.player-name').forEach((input, i) => {
+                    input.placeholder = `참가자 ${i + 1} 이름`;
+                });
             } else {
                 alert('최소 1명의 참가자가 필요합니다.');
             }
@@ -703,8 +707,8 @@
                 questions = Array.isArray(quizData.questions)
                     ? quizData.questions.filter(q => q && typeof q.question === 'string' && q.answer != null)
                     : [];
-                
-                if (!questions || questions.length === 0) {
+
+                if (questions.length === 0) {
                     throw new Error('퀴즈 문제가 생성되지 않았습니다.');
                 }
                 
@@ -843,7 +847,7 @@
             
             // 점수판 생성
             scoreboard.innerHTML = sortedPlayers.map((player, index) => {
-                const isWinner = index === 0;
+                const isWinner = player[1] === winner[1];   // 동점 공동 우승자 모두 강조
                 return `
                     <div class="score-item ${isWinner ? 'winner' : ''}">
                         <span class="score-name">${index + 1}. ${esc(player[0])}</span>

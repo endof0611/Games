@@ -104,7 +104,6 @@ body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-
 .maze-door{cursor:default;-webkit-tap-highlight-color:transparent;}
 .maze-door:active .emoji{transform:scale(0.9);}
 .maze-door .emoji{filter:brightness(0.4)!important;}
-.maze-door.exit-door .emoji{filter:brightness(0.4)!important;}
 .maze-wrong-flash{animation:mwf 0.5s forwards;}
 @keyframes mwf{0%{background:rgba(255,0,0,0.3);}100%{background:transparent;}}
 .maze-danger-edge{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:999;transition:box-shadow 1s;}
@@ -197,7 +196,6 @@ body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-
 .jumpscare-img{position:fixed;top:0;left:0;right:0;bottom:0;z-index:570;display:none;align-items:center;justify-content:center;background:#000;}
 .jumpscare-img img{width:100vw;height:100vh;object-fit:cover;animation:jsImg 0.08s steps(2) infinite;}
 @keyframes jsImg{0%{transform:translate(0,0) scale(1);}25%{transform:translate(-3px,2px) scale(1.02);}50%{transform:translate(4px,-3px) scale(0.99);}75%{transform:translate(-2px,-2px) scale(1.01);}100%{transform:translate(3px,3px) scale(1);}}
-.fade-in{animation:fi 1s forwards;}@keyframes fi{from{opacity:0;}to{opacity:1;}}
 .shake{animation:sk 0.08s infinite;}@keyframes sk{0%,100%{transform:translate(0,0);}25%{transform:translate(-4px,2px);}50%{transform:translate(3px,-3px);}75%{transform:translate(-2px,4px);}}
 </style>
 </head>
@@ -280,7 +278,7 @@ class Au{
   brk(){this.t(60,0.5,'sawtooth',0.4);this.t(40,0.8,'square',0.3);}
   scream(){this.t(55,2.5,'sawtooth',0.35);this.t(58,2.5,'sawtooth',0.3);this.t(110,2,'sine',0.2);setTimeout(()=>{this.t(1800,1.5,'square',0.08);this.t(1850,1.5,'square',0.06);},300);setTimeout(()=>{this.t(30,2,'triangle',0.3);},100);}
   win(){[523,659,784,1047].forEach((n,i)=>setTimeout(()=>this.t(n,0.4,'sine',0.15),i*200));}
-  hb(){if(!this.c||!this.on)return;this.t(50,0.15,'sine',0.3);setTimeout(()=>this.t(45,0.15,'sine',0.25),150);}
+  hb(){this.t(50,0.15,'sine',0.3);setTimeout(()=>this.t(45,0.15,'sine',0.25),150);}
   tap(){this.t(400+Math.random()*200,0.04,'square',0.08);}
   knock(){this.t(150,0.12,'square',0.2);this.t(100,0.15,'triangle',0.15);}
   danger(){this.t(80,0.3,'sawtooth',0.2);this.t(85,0.3,'sawtooth',0.18);}
@@ -410,7 +408,7 @@ function startMaze(){
   MZ.doors=[];
   for(let i=0;i<12;i++){
     const adj=[];const r=Math.floor(i/4),c=i%4;
-    if(c>0)adj.push(i-1);if(c<3)adj.push(i+1);if(r>0)adj.push(i-4);if(r<3)adj.push(i+4);
+    if(c>0)adj.push(i-1);if(c<3)adj.push(i+1);if(r>0)adj.push(i-4);if(r<2)adj.push(i+4);
     MZ.doors.push(adj);
   }
 
@@ -497,7 +495,7 @@ function renderMazeRoom(){
     const isExit=(dp.target===MZ.exit);
     const isCorrectPath=MZ.pathToExit.prev[MZ.pos]===dp.target;
     const el=document.createElement('div');
-    el.className='maze-obj maze-door'+(isExit?' exit-door':'');
+    el.className='maze-obj maze-door';
     el.style.cssText=`left:${dp.x}%;top:${dp.y}%;transform:translate(-50%,-50%);`;
     el.innerHTML=`<span class="emoji">🚪</span><span class="obj-label">${isExit?'':'방 '+(dp.target+1)}</span>`;
     el.onclick=()=>mazeDoorClick(dp.target,isCorrectPath||isExit);
@@ -730,7 +728,7 @@ function startKeypad(){
 }
 
 function renderKeypadDisplay(){
-  const disp=RF.input.map(d=>d).join('');
+  const disp=RF.input.join('');
   const remaining='_'.repeat(4-RF.input.length);
   document.getElementById('keypadDisplay').textContent=disp+remaining;
 }
@@ -785,7 +783,7 @@ function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
 // EVENTS
 document.getElementById('startBtn').onclick=()=>startStage1();
-document.getElementById('retryBtn').onclick=()=>{if(currentStage===1)startStage1();else if(currentStage===2)startStage2();else if(currentStage===3)startStage3();else startStage4();};
+document.getElementById('retryBtn').onclick=()=>{if(currentStage===1||(currentStage===4&&document.getElementById('result-screen').classList.contains('win')))startStage1(); /* 스테이지4 클리어 후 '처음부터' */else if(currentStage===2)startStage2();else if(currentStage===3)startStage3();else startStage4();};
 document.getElementById('nextStageBtn').onclick=()=>{if(currentStage===1)startStage2();else if(currentStage===2)startStage3();else if(currentStage===3)startStage4();};
 document.getElementById('audioToggle').onclick=()=>au.toggle();
 document.getElementById('lightToggle').onclick=()=>doLight();

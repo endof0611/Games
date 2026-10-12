@@ -302,7 +302,7 @@ body {
 #scopeRing {
   position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
   width:240px; height:240px;
-  pointer-events:none; z-index:45; display:none; opacity:0; transition:opacity 0.15s;
+  pointer-events:none; z-index:45; opacity:0; transition:opacity 0.15s;
 }
 #scopeRing.active { opacity:1; }
 
@@ -481,6 +481,9 @@ const gs = {
   ammo:10, maxAmmo:10,
 };
 
+const gameCanvas = document.getElementById('gameCanvas');
+const gctx = gameCanvas.getContext('2d');
+const scopeRing = document.getElementById('scopeRing');
 const joy = { active:false, startX:0, startY:0, dx:0, dy:0, id:null };
 let cvx=0, cvy=0;   // crosshair velocity
 let targets=[], particles=[], bulletHoles=[];
@@ -673,6 +676,9 @@ function beginPlay() {
   spawnTargets();
   timeLeft=gs.timePerStage;
   updateHUD();
+  // 이전 스테이지의 '0'·깜빡임이 1초간 남지 않도록 시간 표시 초기화
+  const hudTime=document.getElementById('hudTime');
+  hudTime.textContent=timeLeft; hudTime.className='hud-value';
   document.getElementById('timerFill').style.width='100%';
   document.getElementById('timerFill').style.background='linear-gradient(to right,#39ff7a,#c8a84b)';
 
@@ -708,8 +714,10 @@ function spawnTargets() {
   const worldH=H*0.72;
   const minY=90, maxY=worldH*0.80;
 
+  // 가로로 눕힌 휴대폰처럼 세로가 짧으면 표적이 이동 범위보다 커지지 않게 제한
+  const maxR=Math.max(12,(maxY-minY)/2-4);
   for(let i=0;i<num;i++){
-    const r=baseR+rand(0,10);
+    const r=Math.min(baseR+rand(0,10),maxR);
     const spd=baseSpd+rand(0,50);
     // 수직 이동이 충분하도록 30~60도 고정
     const angle=rand(30,60)*(Math.PI/180);
@@ -721,8 +729,6 @@ function spawnTargets() {
       r,
       dx:dirX*spd*Math.cos(angle),
       dy:dirY*spd*Math.sin(angle),
-      initSpd:spd,        // 속도 복원용
-      initAngle:angle,    // 각도 복원용
       hit:false, alpha:1,
     });
   }
@@ -738,10 +744,9 @@ function gameLoop(ts) {
   const dt=Math.min((ts-lastTs)/1000,0.05);
   lastTs=ts;
 
-  const canvas=document.getElementById('gameCanvas');
-  const ctx=canvas.getContext('2d');
-  const W=canvas.width, H=canvas.height;
-  ctx.clearRect(0,0,W,H);
+  const W=gameCanvas.width, H=gameCanvas.height;
+  gctx.clearRect(0,0,W,H);
+  const ctx=gctx;
 
   // Move crosshair from joystick
   if (joy.active) {
@@ -753,8 +758,13 @@ function gameLoop(ts) {
   gs.cy=Math.min(Math.max(gs.cy+cvy*dt,0.04),0.88);
 
   drawWorld(ctx,W,H,dt);
-  drawRifle(ctx,W,H);
+  ctx.drawImage(getRifle(W,H),0,0);
   if (!gs.adsActive) drawCrosshair(ctx,W,H);
+  else {
+    // 스코프 링이 화면 중앙이 아니라 실제 조준점(탄착점)을 따라가게
+    scopeRing.style.left=(gs.cx*100)+'%';
+    scopeRing.style.top=(gs.cy*100)+'%';
+  }
 
   rafId=requestAnimationFrame(gameLoop);
 }
@@ -851,18 +861,8 @@ function drawWorld(ctx,W,H,dt) {
       if(t.wy+t.r>maxY){
         t.wy=maxY-t.r;
         t.dy=-Math.abs(t.dy);  // 반드시 위쪽
-
-        // 속도가 소멸됐으면 초기 속도로 복원
-        if(Math.abs(t.dy)<10) t.dy=-(t.initSpd*Math.sin(t.initAngle));
       }
-
-      // 속도 크기가 너무 작아진 경우 전체 복원 (에너지 손실 방지)
-      const spd=Math.hypot(t.dx,t.dy);
-      if(spd<t.initSpd*0.5){
-        const angle=Math.atan2(t.dy,t.dx);
-        t.dx=Math.cos(angle)*t.initSpd;
-        t.dy=Math.sin(angle)*t.initSpd;
-      }
+      // 반사 시 부호만 바뀌고 속도 크기는 그대로라 별도 속도 복원은 필요 없음
     }
     if(t.alpha>0) drawTarget(ctx,t);
   }
@@ -896,6 +896,14 @@ function drawTarget(ctx,t){
 // ─────────────────────────────
 //  RIFLE (1st person)
 // ─────────────────────────────
+// 바닥·총은 움직이지 않으므로 화면 크기가 바뀔 때만 다시 그림 (getBg와 동일한 캐시 방식)
+let rifleCache=null;
+function getRifle(W,H){
+  if(rifleCache&&rifleCache.width===W&&rifleCache.height===H) return rifleCache;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  drawRifle(c.getContext('2d'),W,H);
+  rifleCache=c; return c;
+}
 function drawRifle(ctx,W,H){
   const groundY=H*0.72;
   // Floor
@@ -1003,7 +1011,7 @@ function doShoot(){
       pts=Math.round(pts*(1+(gs.stage-1)*0.5));
       gs.totalScores[gs.pIdx]+=pts;
       updateHUD();
-      showScorePopup(sx,sy,pts);
+      showScorePopup(sx,sy,pts,pct<=0.2);
       spawnParticles(t.wx,t.wy,pct<=0.2?'#f5a623':pct<=0.6?'#e84855':'#fff');
       playHit(pct<=0.2);  // 명중음 (퍼펙트 여부)
       break;
@@ -1023,8 +1031,7 @@ function doShoot(){
 // ─────────────────────────────
 document.getElementById('gameCanvas').addEventListener('mousemove',e=>{
   if(gs.phase!=='playing'||isMobile) return;
-  const c=document.getElementById('gameCanvas');
-  gs.cx=e.clientX/c.width; gs.cy=e.clientY/c.height;
+  gs.cx=e.clientX/gameCanvas.width; gs.cy=e.clientY/gameCanvas.height;
 });
 document.getElementById('gameCanvas').addEventListener('click',e=>{
   if(gs.phase!=='playing'||isMobile) return;
@@ -1052,8 +1059,10 @@ jZone.addEventListener('touchstart',e=>{
   joy.active=true; joy.id=touch.identifier;
   joy.startX=touch.clientX; joy.startY=touch.clientY;
   joy.dx=0; joy.dy=0;
-  jBase.style.left=touch.clientX+'px';
-  jBase.style.top=touch.clientY+'px';
+  // jBase는 jZone(화면 하단 영역) 기준 absolute 이므로 영역 좌표로 변환
+  const zr=jZone.getBoundingClientRect();
+  jBase.style.left=(touch.clientX-zr.left)+'px';
+  jBase.style.top=(touch.clientY-zr.top)+'px';
   jBase.style.display='block';
   jKnob.style.left='50%'; jKnob.style.top='50%';
 },{passive:false});
@@ -1107,11 +1116,12 @@ function updateAmmoBar(){
     bar.appendChild(d);
   }
 }
-function showScorePopup(x,y,pts){
+// perfect: 정중앙(반지름 20% 이내) 명중 여부 - 스테이지 배율 때문에 점수만으로는 판단 불가
+function showScorePopup(x,y,pts,perfect=false){
   const el=document.createElement('div'); el.className='score-popup';
   el.style.left=x+'px'; el.style.top=(y-30)+'px';
   if(pts<0){ el.style.color='#445060'; el.style.fontSize='13px'; el.textContent='MISS'; }
-  else if(pts>=8){ el.style.color='#f5a623'; el.textContent=`🎯 +${pts} PERFECT`; }
+  else if(perfect){ el.style.color='#f5a623'; el.textContent=`🎯 +${pts} PERFECT`; }
   else { el.style.color=pts>=5?'#e84855':'#4fc3f7'; el.textContent=`+${pts}`; }
   document.body.appendChild(el);
   setTimeout(()=>el.remove(),900);
@@ -1258,7 +1268,7 @@ window.addEventListener('orientationchange',()=>{
   setTimeout(()=>{ resizeCanvas(); stopJoy(); }, 200);
 });
 document.getElementById('gameCanvas').addEventListener('contextmenu',e=>e.preventDefault());
-document.addEventListener('touchmove',e=>{ if(e.target===document.getElementById('gameCanvas')) e.preventDefault(); },{passive:false});
+document.addEventListener('touchmove',e=>{ if(e.target===gameCanvas) e.preventDefault(); },{passive:false});
 
 // AudioContext 모바일 unlock (첫 터치/클릭 시 자동 활성화)
 ['touchstart','mousedown'].forEach(ev=>{

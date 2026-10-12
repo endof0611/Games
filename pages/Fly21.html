@@ -27,6 +27,8 @@
     position: relative;
     width: 800px;
     height: 480px;
+    flex-shrink: 0;
+    transform-origin: center center;   /* 작은 화면에서는 JS로 축소 (fitToScreen) */
   }
 
   #gameCanvas {
@@ -174,6 +176,15 @@ const startBtn = document.getElementById('startBtn');
 
 const W = 800, H = 480;
 
+// 800x480 화면을 휴대폰 등 작은 화면에 맞게 축소
+const wrapper = document.getElementById('gameWrapper');
+function fitToScreen() {
+  const s = Math.min(1, (window.innerWidth - 8) / W, (window.innerHeight - 8) / H);
+  wrapper.style.transform = s < 1 ? `scale(${s})` : '';
+}
+window.addEventListener('resize', fitToScreen);
+fitToScreen();
+
 // ── Game State ──────────────────────────────────────────────────
 let state = 'idle'; // idle | playing | dead
 let score = 0;
@@ -237,6 +248,9 @@ function spawnObstacle() {
     botY: gapY + gapH,
     botH: H - gapY - gapH,
     color,
+    light30: lighten(color, 30),   // 매 프레임 색 계산하지 않도록 미리 저장
+    light40: lighten(color, 40),
+    dark20: darken(color, 20),
     hit: false,
     shake: 0
   });
@@ -257,7 +271,10 @@ function checkCollision() {
       }
     }
   }
-  if (MAN.y < 0 || MAN.y + MAN.h > H) {
+  // 화면 밖으로 사라지지 않게 위·아래 가장자리에서 멈춤 (닿아 있는 동안은 계속 목숨 감소)
+  if (MAN.y <= 0 || MAN.y + MAN.h >= H) {
+    MAN.y = Math.max(0, Math.min(H - MAN.h, MAN.y));
+    MAN.vy = 0;
     if (!MAN.edgeHit) {
       MAN.edgeHit = true;
       loseLife();
@@ -288,12 +305,13 @@ function updateLivesUI() {
 }
 
 // ── Drawing helpers ──────────────────────────────────────────────
+const skyGrad = ctx.createLinearGradient(0,0,0,H);   // 고정 배경이므로 한 번만 생성
+skyGrad.addColorStop(0, '#1a6bcc');
+skyGrad.addColorStop(0.5, '#3a9eef');
+skyGrad.addColorStop(1, '#87ceeb');
+
 function drawSky() {
-  const grad = ctx.createLinearGradient(0,0,0,H);
-  grad.addColorStop(0, '#1a6bcc');
-  grad.addColorStop(0.5, '#3a9eef');
-  grad.addColorStop(1, '#87ceeb');
-  ctx.fillStyle = grad;
+  ctx.fillStyle = skyGrad;
   ctx.fillRect(0,0,W,H);
 
   // Clouds
@@ -311,7 +329,7 @@ function drawSky() {
 
 function drawStars(dt) {
   for (const s of stars) {
-    s.x -= s.speed * speed * dt * 0.5;
+    s.x -= s.speed * speed * dt * 60 * 0.5;   // dt(초) → 60fps 프레임 단위 (drawCity와 동일)
     if (s.x < 0) { s.x = W; s.y = Math.random()*H; }
     ctx.save();
     ctx.translate(s.x, s.y);
@@ -374,28 +392,18 @@ function drawObstacle(o) {
   const sx = o.shake > 0 ? (Math.random()-0.5)*4 : 0;
   if (o.shake > 0) o.shake -= gk;
 
-  // top pillar
-  const grad1 = ctx.createLinearGradient(o.x+sx, 0, o.x+o.w+sx, 0);
-  grad1.addColorStop(0, o.color);
-  grad1.addColorStop(0.5, lighten(o.color, 30));
-  grad1.addColorStop(1, darken(o.color, 20));
-  ctx.fillStyle = grad1;
+  // pillars (위·아래 기둥은 같은 가로 그라디언트를 공유)
+  const grad = ctx.createLinearGradient(o.x+sx, 0, o.x+o.w+sx, 0);
+  grad.addColorStop(0, o.color);
+  grad.addColorStop(0.5, o.light30);
+  grad.addColorStop(1, o.dark20);
+  ctx.fillStyle = grad;
   ctx.fillRect(o.x+sx, 0, o.w, o.topH);
-
-  // top cap
-  ctx.fillStyle = lighten(o.color, 40);
-  ctx.fillRect(o.x+sx-4, o.topH-16, o.w+8, 16);
-
-  // bottom pillar
-  const grad2 = ctx.createLinearGradient(o.x+sx, 0, o.x+o.w+sx, 0);
-  grad2.addColorStop(0, o.color);
-  grad2.addColorStop(0.5, lighten(o.color, 30));
-  grad2.addColorStop(1, darken(o.color, 20));
-  ctx.fillStyle = grad2;
   ctx.fillRect(o.x+sx, o.botY, o.w, o.botH);
 
-  // bot cap
-  ctx.fillStyle = lighten(o.color, 40);
+  // caps
+  ctx.fillStyle = o.light40;
+  ctx.fillRect(o.x+sx-4, o.topH-16, o.w+8, 16);
   ctx.fillRect(o.x+sx-4, o.botY, o.w+8, 16);
 }
 
@@ -616,7 +624,7 @@ function drawScore() {
 }
 
 // ── Main loop ────────────────────────────────────────────────────
-function update(dt) {
+function update() {
   if (state !== 'playing') return;
 
   frame += gk;
@@ -665,7 +673,7 @@ function loop(ts) {
   const dt = Math.min((ts - lastTime) / 1000, 0.05);
   lastTime = ts;
   gk = dt * 60;
-  update(dt);
+  update();
   draw();
   raf = requestAnimationFrame(loop);
 }
