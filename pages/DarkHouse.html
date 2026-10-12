@@ -415,8 +415,7 @@ function startMaze(){
   // Exit: random room on far side (rooms 8-11)
   MZ.exit=[8,9,10,11][Math.floor(Math.random()*4)];
   // Among each room's doors, only ONE leads to exit path. Others are wrong (2s penalty).
-  // Precompute shortest path from each room to exit using BFS
-  MZ.pathToExit=bfsPaths(MZ.exit);
+  // 정답 문은 renderMazeRoom에서 흉악범 위치를 피하는 최단 경로로 매번 다시 계산
 
   // Killer starts at room farthest from player (room 11 or so)
   const farRooms=[8,9,10,11].filter(r=>r!==MZ.exit);
@@ -438,27 +437,30 @@ function startMaze(){
   MZ.killerTimer=setInterval(()=>{ /* ⏱️ 흉악범 이동 간격: 4초 (낮을수록 어려움) */
     if(MZ.phase!=='play')return;
     moveKiller();
-    if(MZ.killer===MZ.pos){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('흉악범에게 발각되었습니다...');}
-    renderMazeMinimap();
+    if(MZ.killer===MZ.pos){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('흉악범에게 발각되었습니다...');return;}
+    // 흉악범이 움직이면 그 방을 피하는 길로 정답 문이 바뀔 수 있으므로 다시 그림
+    renderMazeRoom();renderMazeMinimap();
     // Footstep sound when killer is close
     const dist=getDistance(MZ.pos,MZ.killer);
     if(dist<=2)au.foot();
+    if(dist===1)showMazeMsg('⚠ 바로 옆방에서 발소리가 들린다! 빨리 움직여!');
   },4000);
 }
 
-function bfsPaths(target){
+// blocked: 지나갈 수 없는 방 (생략 가능)
+function bfsPaths(target,blocked=-1){
   const prev=new Array(12).fill(-1);const dist=new Array(12).fill(Infinity);
   dist[target]=0;const q=[target];
-  while(q.length){const cur=q.shift();for(const n of MZ.doors[cur]){if(dist[n]===Infinity){dist[n]=dist[cur]+1;prev[n]=cur;q.push(n);}}}
+  while(q.length){const cur=q.shift();for(const n of MZ.doors[cur]){if(n!==blocked&&dist[n]===Infinity){dist[n]=dist[cur]+1;prev[n]=cur;q.push(n);}}}
   return{prev,dist};
 }
 function getDistance(a,b){
   const p=bfsPaths(b);return p.dist[a];
 }
 function moveKiller(){
-  // Move killer one step toward player
+  // Move killer one step toward player (옆방이면 플레이어 방으로 들어와 잡는다)
   const p=bfsPaths(MZ.pos);
-  if(p.dist[MZ.killer]<=1)return;// already adjacent or same
+  if(p.dist[MZ.killer]===0)return;
   const next=p.prev[MZ.killer];
   if(next!==-1)MZ.killer=next;
 }
@@ -478,6 +480,8 @@ function renderMazeRoom(){
 
   // Doors to adjacent rooms
   const adj=MZ.doors[MZ.pos];
+  // 흉악범이 있는 방을 피해서 출구로 가는 최단 경로 (격자라 방 하나를 막아도 항상 우회로가 있음)
+  const path=bfsPaths(MZ.exit,MZ.killer);
   const doorPositions=[];
   const r=Math.floor(MZ.pos/4),c=MZ.pos%4;
   // Place doors on walls based on direction
@@ -493,7 +497,7 @@ function renderMazeRoom(){
 
   doorPositions.forEach(dp=>{
     const isExit=(dp.target===MZ.exit);
-    const isCorrectPath=MZ.pathToExit.prev[MZ.pos]===dp.target;
+    const isCorrectPath=path.prev[MZ.pos]===dp.target;
     const el=document.createElement('div');
     el.className='maze-obj maze-door';
     el.style.cssText=`left:${dp.x}%;top:${dp.y}%;transform:translate(-50%,-50%);`;
