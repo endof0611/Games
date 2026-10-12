@@ -433,8 +433,8 @@ function startMaze(){
     if(MZ.timeLeft<=0){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('시간 초과... 흉악범에게 잡혔습니다.');}
   },1000);
 
-  // Killer moves every 4 seconds toward player
-  MZ.killerTimer=setInterval(()=>{ /* ⏱️ 흉악범 이동 간격: 4초 (낮을수록 어려움) */
+  // Killer moves every 5 seconds toward player
+  MZ.killerTimer=setInterval(()=>{ /* ⏱️ 흉악범 이동 간격: 5초 (낮을수록 어려움) */
     if(MZ.phase!=='play')return;
     moveKiller();
     if(MZ.killer===MZ.pos){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('흉악범에게 발각되었습니다...');return;}
@@ -444,7 +444,7 @@ function startMaze(){
     const dist=getDistance(MZ.pos,MZ.killer);
     if(dist<=2)au.foot();
     if(dist===1)showMazeMsg('⚠ 바로 옆방에서 발소리가 들린다! 빨리 움직여!');
-  },4000);
+  },5000);
 }
 
 // blocked: 지나갈 수 없는 방 (생략 가능)
