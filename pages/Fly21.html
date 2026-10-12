@@ -179,7 +179,9 @@ const W = 800, H = 480;
 // 800x480 화면을 휴대폰 등 작은 화면에 맞게 축소
 const wrapper = document.getElementById('gameWrapper');
 function fitToScreen() {
-  const s = Math.min(1, (window.innerWidth - 8) / W, (window.innerHeight - 8) / H);
+  // innerWidth는 모바일에서 800px 박스 때문에 실제 화면보다 커지므로 clientWidth/Height 사용
+  const vw = document.documentElement.clientWidth, vh = document.documentElement.clientHeight;
+  const s = Math.min(1, (vw - 8) / W, (vh - 8) / H);
   wrapper.style.transform = s < 1 ? `scale(${s})` : '';
 }
 window.addEventListener('resize', fitToScreen);
