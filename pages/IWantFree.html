@@ -67,11 +67,27 @@ const C = {
 const SFX = (() => {
   let ctx = null;
   let muted = false;
+  // 아이폰: 무음(진동) 모드에서도 게임 소리가 나도록 '재생' 오디오로 지정 (iOS 17+ Safari)
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
   const getCtx = () => {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
+    // iOS는 전화·백그라운드 전환 뒤 'interrupted' 상태가 되므로 running이 아니면 모두 재개
+    if (ctx.state !== 'running') ctx.resume();
     return ctx;
   };
+  // 첫 터치/클릭 때 무음 버퍼를 한 번 재생해 모바일 오디오 잠금 해제
+  const unlock = () => {
+    try {
+      const c = getCtx();
+      const src = c.createBufferSource();
+      src.buffer = c.createBuffer(1, 1, 22050);
+      src.connect(c.destination); src.start(0);
+    } catch(e){}
+    if (ctx && ctx.state === 'running') ['touchend','pointerup','keydown'].forEach(ev => window.removeEventListener(ev, unlock, true));
+  };
+  ['touchend','pointerup','keydown'].forEach(ev => window.addEventListener(ev, unlock, true));
+  // 다른 앱/탭에 갔다 돌아오면 오디오 재개
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && ctx && ctx.state !== 'running') ctx.resume(); });
 
   const play = (fn) => { if (muted) return; try { fn(getCtx()); } catch(e){} };
 
