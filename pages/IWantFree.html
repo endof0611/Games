@@ -239,6 +239,7 @@ const SFX = (() => {
 function TitleScreen({onStart,stats}) {
   const [blink, setBlink] = useState(true);
   useEffect(() => { const i=setInterval(()=>setBlink(b=>!b),600); return ()=>clearInterval(i); }, []);
+  const hasStats=!!stats&&(stats.fails+stats.best+stats.clears>0);
 
   return e('div', {style:{width:'100%',height:'100%',background:`radial-gradient(ellipse at 50% 80%,${C.bgLight},${C.bg})`,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:18,position:'relative',overflow:'hidden'}},
     e('div',{style:{position:'absolute',top:0,left:0,right:0,bottom:0,background:'repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,0.08) 3px,rgba(0,0,0,0.08) 4px)',pointerEvents:'none'}}),
@@ -252,8 +253,8 @@ function TitleScreen({onStart,stats}) {
       e('span',{style:{animation:'float 2s ease-in-out infinite 0.6s'}},'🛹'),
       e('span',{style:{animation:'float 2s ease-in-out infinite 0.9s'}},'📖'),
     ),
-    stats&&(stats.fails+stats.best+stats.clears>0)?e('div',{style:{fontFamily:PF,fontSize:7,color:C.safe,marginTop:16,lineHeight:2,textAlign:'center'}},`🏅 최고 LEVEL ${stats.best} · 😱 들킨 횟수 ${stats.fails} · 🏆 올클리어 ${stats.clears}`):null,
-    e('button',{onClick:()=>{SFX.click();onStart();},style:{marginTop:stats&&(stats.fails+stats.best+stats.clears>0)?14:28,fontFamily:PF,fontSize:11,padding:'14px 36px',background:blink?`linear-gradient(135deg,${C.accent},#ff9900)`:`linear-gradient(135deg,#ff9900,${C.accent})`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'4px 4px 0 #000',transition:'all 0.15s',transform:blink?'scale(1)':'scale(1.05)'}},'게임 시작!'),
+    hasStats?e('div',{style:{fontFamily:PF,fontSize:7,color:C.safe,marginTop:16,lineHeight:2,textAlign:'center'}},`🏅 최고 LEVEL ${stats.best} · 😱 들킨 횟수 ${stats.fails} · 🏆 올클리어 ${stats.clears}`):null,
+    e('button',{onClick:()=>{SFX.click();onStart();},style:{marginTop:hasStats?14:28,fontFamily:PF,fontSize:11,padding:'14px 36px',background:blink?`linear-gradient(135deg,${C.accent},#ff9900)`:`linear-gradient(135deg,#ff9900,${C.accent})`,color:C.dark,border:'3px solid #000',borderRadius:6,cursor:'pointer',boxShadow:'4px 4px 0 #000',transition:'all 0.15s',transform:blink?'scale(1)':'scale(1.05)'}},'게임 시작!'),
     e('div',{style:{fontFamily:PF,fontSize:7,color:'rgba(255,255,255,0.35)',marginTop:16}},'TAP / CLICK to play')
   );
 }
@@ -1273,7 +1274,7 @@ function Level7({onClear,onFail}) {
     ),
     // 겨리 방 문
     e('div',{style:{position:'absolute',left:10,top:120,width:56,height:116,background:warn||peek?'linear-gradient(180deg,#a68b4a,#80642a)':'linear-gradient(180deg,#6a5a3a,#5a4a2a)',borderRadius:4,border:'2px solid #4a3a2a',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',boxShadow:warn?'0 0 26px rgba(255,204,0,0.85)':peek?'0 0 18px rgba(255,204,0,0.5)':'none',animation:warn?'shake 0.25s infinite':'none'}},
-      e('span',{style:{fontSize:28}},peek?'👀':warn?'🚪':'🚪'),
+      e('span',{style:{fontSize:28}},peek?'👀':'🚪'),
       e('span',{style:{fontFamily:PF,fontSize:6,color:'#fff',marginTop:4}},'겨리 방')
     ),
     warn?e('div',{style:{position:'absolute',left:72,top:130,fontFamily:PF,fontSize:9,color:C.danger,animation:'pulse 0.3s infinite'}},'끼이익…'):null,

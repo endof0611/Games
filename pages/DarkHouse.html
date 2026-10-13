@@ -104,7 +104,6 @@ body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-
 .maze-door{cursor:default;-webkit-tap-highlight-color:transparent;}
 .maze-door:active .emoji{transform:scale(0.9);}
 .maze-door .emoji{filter:brightness(0.4)!important;}
-.maze-door.exit-door .emoji{filter:brightness(0.4)!important;}
 .maze-wrong-flash{animation:mwf 0.5s forwards;}
 @keyframes mwf{0%{background:rgba(255,0,0,0.3);}100%{background:transparent;}}
 .maze-danger-edge{position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:999;transition:box-shadow 1s;}
@@ -197,7 +196,6 @@ body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-
 .jumpscare-img{position:fixed;top:0;left:0;right:0;bottom:0;z-index:570;display:none;align-items:center;justify-content:center;background:#000;}
 .jumpscare-img img{width:100vw;height:100vh;object-fit:cover;animation:jsImg 0.08s steps(2) infinite;}
 @keyframes jsImg{0%{transform:translate(0,0) scale(1);}25%{transform:translate(-3px,2px) scale(1.02);}50%{transform:translate(4px,-3px) scale(0.99);}75%{transform:translate(-2px,-2px) scale(1.01);}100%{transform:translate(3px,3px) scale(1);}}
-.fade-in{animation:fi 1s forwards;}@keyframes fi{from{opacity:0;}to{opacity:1;}}
 .shake{animation:sk 0.08s infinite;}@keyframes sk{0%,100%{transform:translate(0,0);}25%{transform:translate(-4px,2px);}50%{transform:translate(3px,-3px);}75%{transform:translate(-2px,4px);}}
 </style>
 </head>
@@ -280,7 +278,7 @@ class Au{
   brk(){this.t(60,0.5,'sawtooth',0.4);this.t(40,0.8,'square',0.3);}
   scream(){this.t(55,2.5,'sawtooth',0.35);this.t(58,2.5,'sawtooth',0.3);this.t(110,2,'sine',0.2);setTimeout(()=>{this.t(1800,1.5,'square',0.08);this.t(1850,1.5,'square',0.06);},300);setTimeout(()=>{this.t(30,2,'triangle',0.3);},100);}
   win(){[523,659,784,1047].forEach((n,i)=>setTimeout(()=>this.t(n,0.4,'sine',0.15),i*200));}
-  hb(){if(!this.c||!this.on)return;this.t(50,0.15,'sine',0.3);setTimeout(()=>this.t(45,0.15,'sine',0.25),150);}
+  hb(){this.t(50,0.15,'sine',0.3);setTimeout(()=>this.t(45,0.15,'sine',0.25),150);}
   tap(){this.t(400+Math.random()*200,0.04,'square',0.08);}
   knock(){this.t(150,0.12,'square',0.2);this.t(100,0.15,'triangle',0.15);}
   danger(){this.t(80,0.3,'sawtooth',0.2);this.t(85,0.3,'sawtooth',0.18);}
@@ -410,15 +408,14 @@ function startMaze(){
   MZ.doors=[];
   for(let i=0;i<12;i++){
     const adj=[];const r=Math.floor(i/4),c=i%4;
-    if(c>0)adj.push(i-1);if(c<3)adj.push(i+1);if(r>0)adj.push(i-4);if(r<3)adj.push(i+4);
+    if(c>0)adj.push(i-1);if(c<3)adj.push(i+1);if(r>0)adj.push(i-4);if(r<2)adj.push(i+4);
     MZ.doors.push(adj);
   }
 
   // Exit: random room on far side (rooms 8-11)
   MZ.exit=[8,9,10,11][Math.floor(Math.random()*4)];
   // Among each room's doors, only ONE leads to exit path. Others are wrong (2s penalty).
-  // Precompute shortest path from each room to exit using BFS
-  MZ.pathToExit=bfsPaths(MZ.exit);
+  // 정답 문은 renderMazeRoom에서 흉악범 위치를 피하는 최단 경로로 매번 다시 계산
 
   // Killer starts at room farthest from player (room 11 or so)
   const farRooms=[8,9,10,11].filter(r=>r!==MZ.exit);
@@ -436,31 +433,34 @@ function startMaze(){
     if(MZ.timeLeft<=0){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('시간 초과... 흉악범에게 잡혔습니다.');}
   },1000);
 
-  // Killer moves every 4 seconds toward player
-  MZ.killerTimer=setInterval(()=>{ /* ⏱️ 흉악범 이동 간격: 4초 (낮을수록 어려움) */
+  // Killer moves every 5 seconds toward player
+  MZ.killerTimer=setInterval(()=>{ /* ⏱️ 흉악범 이동 간격: 5초 (낮을수록 어려움) */
     if(MZ.phase!=='play')return;
     moveKiller();
-    if(MZ.killer===MZ.pos){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('흉악범에게 발각되었습니다...');}
-    renderMazeMinimap();
+    if(MZ.killer===MZ.pos){clearInterval(MZ.timer);clearInterval(MZ.killerTimer);au.stopAmb();MZ.phase='done';showFailResult('흉악범에게 발각되었습니다...');return;}
+    // 흉악범이 움직이면 그 방을 피하는 길로 정답 문이 바뀔 수 있으므로 다시 그림
+    renderMazeRoom();renderMazeMinimap();
     // Footstep sound when killer is close
     const dist=getDistance(MZ.pos,MZ.killer);
     if(dist<=2)au.foot();
-  },4000);
+    if(dist===1)showMazeMsg('⚠ 바로 옆방에서 발소리가 들린다! 빨리 움직여!');
+  },5000);
 }
 
-function bfsPaths(target){
+// blocked: 지나갈 수 없는 방 (생략 가능)
+function bfsPaths(target,blocked=-1){
   const prev=new Array(12).fill(-1);const dist=new Array(12).fill(Infinity);
   dist[target]=0;const q=[target];
-  while(q.length){const cur=q.shift();for(const n of MZ.doors[cur]){if(dist[n]===Infinity){dist[n]=dist[cur]+1;prev[n]=cur;q.push(n);}}}
+  while(q.length){const cur=q.shift();for(const n of MZ.doors[cur]){if(n!==blocked&&dist[n]===Infinity){dist[n]=dist[cur]+1;prev[n]=cur;q.push(n);}}}
   return{prev,dist};
 }
 function getDistance(a,b){
   const p=bfsPaths(b);return p.dist[a];
 }
 function moveKiller(){
-  // Move killer one step toward player
+  // Move killer one step toward player (옆방이면 플레이어 방으로 들어와 잡는다)
   const p=bfsPaths(MZ.pos);
-  if(p.dist[MZ.killer]<=1)return;// already adjacent or same
+  if(p.dist[MZ.killer]===0)return;
   const next=p.prev[MZ.killer];
   if(next!==-1)MZ.killer=next;
 }
@@ -480,6 +480,8 @@ function renderMazeRoom(){
 
   // Doors to adjacent rooms
   const adj=MZ.doors[MZ.pos];
+  // 흉악범이 있는 방을 피해서 출구로 가는 최단 경로 (격자라 방 하나를 막아도 항상 우회로가 있음)
+  const path=bfsPaths(MZ.exit,MZ.killer);
   const doorPositions=[];
   const r=Math.floor(MZ.pos/4),c=MZ.pos%4;
   // Place doors on walls based on direction
@@ -495,9 +497,9 @@ function renderMazeRoom(){
 
   doorPositions.forEach(dp=>{
     const isExit=(dp.target===MZ.exit);
-    const isCorrectPath=MZ.pathToExit.prev[MZ.pos]===dp.target;
+    const isCorrectPath=path.prev[MZ.pos]===dp.target;
     const el=document.createElement('div');
-    el.className='maze-obj maze-door'+(isExit?' exit-door':'');
+    el.className='maze-obj maze-door';
     el.style.cssText=`left:${dp.x}%;top:${dp.y}%;transform:translate(-50%,-50%);`;
     el.innerHTML=`<span class="emoji">🚪</span><span class="obj-label">${isExit?'':'방 '+(dp.target+1)}</span>`;
     el.onclick=()=>mazeDoorClick(dp.target,isCorrectPath||isExit);
@@ -578,19 +580,27 @@ function startRooftop(){
 }
 
 function generateCode(){return [1,2,3,4].map(()=>Math.floor(Math.random()*10));}
+// 힌트마다 자릿수 하나가 정확히 하나로 정해지는 간단한 계산 문제 (4개 힌트 → 비밀번호 1개)
 function generateHints(code){
-  const hints=[];
-  const hintTemplates=[
-    (d)=>`첫째 자리: ${d} 보다 ${code[0]>d?'큼':'작거나 같음'}`,
-    (d)=>`둘째 자리: ${code[1]%2===0?'짝수':'홀수'}`,
-    (d)=>`셋째 자리: ${code[2]<5?'5 미만':'5 이상'}`,
-    (d)=>`넷째 자리: ${code[3]}`,
+  const ri=(lo,hi)=>lo+Math.floor(Math.random()*(hi-lo+1));
+  const [d0,d1,d2,d3]=code;
+  // 1) 덧셈
+  const a=ri(0,d0);
+  // 2) 첫째 자리와의 차이
+  const diff=d1-d0;
+  const h2=diff===0?'첫째 자리와 같음':`첫째 자리 ${diff>0?'+':'−'} ${Math.abs(diff)}`;
+  // 3) 곱셈의 일의 자리 (0~9 모두 2~9 사이 두 수의 곱으로 만들 수 있음)
+  const pairs=[];
+  for(let x=2;x<=9;x++)for(let y=x;y<=9;y++)if((x*y)%10===d2)pairs.push([x,y]);
+  const [x,y]=pairs[ri(0,pairs.length-1)];
+  // 4) 뺄셈
+  const k=ri(1,9);
+  return [
+    `첫째 자리 = ${a} + ${d0-a}`,
+    `둘째 자리 = ${h2}`,
+    `셋째 자리 = ${x} × ${y} 의 일의 자리`,
+    `넷째 자리 = ${d3+k} − ${k}`,
   ];
-  hintTemplates.forEach((fn)=>{
-    const dummy=Math.floor(Math.random()*10);
-    hints.push(fn(dummy));
-  });
-  return hints;
 }
 
 function startRoofTimer(){
@@ -730,7 +740,7 @@ function startKeypad(){
 }
 
 function renderKeypadDisplay(){
-  const disp=RF.input.map(d=>d).join('');
+  const disp=RF.input.join('');
   const remaining='_'.repeat(4-RF.input.length);
   document.getElementById('keypadDisplay').textContent=disp+remaining;
 }
@@ -785,7 +795,7 @@ function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
 
 // EVENTS
 document.getElementById('startBtn').onclick=()=>startStage1();
-document.getElementById('retryBtn').onclick=()=>{if(currentStage===1)startStage1();else if(currentStage===2)startStage2();else if(currentStage===3)startStage3();else startStage4();};
+document.getElementById('retryBtn').onclick=()=>{if(currentStage===1||(currentStage===4&&document.getElementById('result-screen').classList.contains('win')))startStage1(); /* 스테이지4 클리어 후 '처음부터' */else if(currentStage===2)startStage2();else if(currentStage===3)startStage3();else startStage4();};
 document.getElementById('nextStageBtn').onclick=()=>{if(currentStage===1)startStage2();else if(currentStage===2)startStage3();else if(currentStage===3)startStage4();};
 document.getElementById('audioToggle').onclick=()=>au.toggle();
 document.getElementById('lightToggle').onclick=()=>doLight();

@@ -15,7 +15,7 @@
         .input-group { display: flex; flex-direction: column; gap: 8px; flex: 1; min-width: 180px; }
         label { font-weight: bold; font-size: 0.85em; color: #555; }
         button { background-color: var(--accent); color: white; border: none; padding: 12px 25px; border-radius: 8px; cursor: pointer; font-weight: bold; }
-        .copy-btn { background-color: var(--success); width: 100%; display: none; padding: 15px; border-radius: 8px; border:none; color:white; cursor:pointer; font-weight:bold; margin-bottom: 15px; }
+        .copy-btn { background-color: var(--success); width: 100%; display: none; padding: 15px; margin-bottom: 15px; }
         
         /* 📍 결과 번호 폰트 및 레이아웃 최적화 */
         .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
@@ -48,7 +48,7 @@
                 <input type="text" id="birthDate" value="19770726" placeholder="8자리 입력" style="padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
             </div>
             <div class="input-group">
-                <label>🔍 분석 데이터 범위 (최근 <span id="winVal">1</span>회차)</label>
+                <label>🔍 분석 데이터 범위 (최근 <span id="winVal">30</span>회차)</label>
                 <input type="range" id="windowSize" min="1" max="100" value="30" oninput="document.getElementById('winVal').innerText=this.value" style="width: 100%;">
                 <div style="display:flex; justify-content:space-between; font-size:0.75em; color:#888;">
                     <span>최소 1회</span>
@@ -1360,6 +1360,11 @@
     async function runAnalysis() {
         if (analysisRunning) return;
         analysisRunning = true;
+        try { await analyze(); }
+        finally { analysisRunning = false; }   // 오류가 나도 다시 실행할 수 있게
+    }
+
+    async function analyze() {
         const birth = document.getElementById('birthDate').value;
         const win = Math.max(1, Math.min(HISTORY.length, parseInt(document.getElementById('windowSize').value) || 30));
         const risk = parseInt(document.getElementById('riskType').value);
@@ -1397,10 +1402,10 @@
                 let prizeStats = {1:0, 2:0, 3:0, 4:0, 5:0};
                 
                 analysisData.forEach(row => {
-                    const actual = row.slice(2,8);
                     const bonus = row[8];
                     const pred = runSimulation(mId, s, row[1], birth);
-                    const match = pred.filter(n => actual.includes(n)).length;
+                    let match = 0;
+                    for (let k = 2; k < 8; k++) if (pred.includes(row[k])) match++;   // row.slice() 배열 생성 없이 비교
                     
                     if(match === 6) { prizeStats[1]++; prize += 2000000000; }
                     else if(match === 5 && pred.includes(bonus)) { prizeStats[2]++; prize += 50000000; }
@@ -1418,7 +1423,6 @@
         pContainer.style.display = 'none';
         sMsg.innerText = `최근 ${win}회차 분석 완료!`;
         document.getElementById('masterCopyBtn').style.display = 'block';
-        analysisRunning = false;
     }
 
     function renderResults(top5, birth, winSize) {
