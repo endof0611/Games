@@ -139,6 +139,9 @@
     letter-spacing: 2px;
     pointer-events: none;
   }
+/* 연타·길게 누르기 때 글자 선택, 돋보기, 복사 메뉴, 드래그가 생겨 조작을 방해하지 않도록 (iOS 사파리는 -webkit- 접두어 필요) */
+*{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none;}
+input,textarea{-webkit-user-select:text;user-select:text;}
 </style>
 </head>
 <body>
@@ -163,6 +166,8 @@
 </div>
 
 <script>
+// 입력칸을 제외하고 글자 선택·길게 누르기 메뉴·드래그 시작을 막음
+['selectstart','contextmenu','dragstart'].forEach(ev=>document.addEventListener(ev,e=>{if(!e.target.closest||!e.target.closest('input,textarea'))e.preventDefault();}));
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');

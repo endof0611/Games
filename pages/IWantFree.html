@@ -20,6 +20,9 @@
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
   @keyframes cloudMove { 0%{transform:translateX(0)} 100%{transform:translateX(560px)} }
   @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-4px)} 75%{transform:translateX(4px)} }
+/* 연타·길게 누르기 때 글자 선택, 돋보기, 복사 메뉴, 드래그가 생겨 조작을 방해하지 않도록 (iOS 사파리는 -webkit- 접두어 필요) */
+*{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none;}
+input,textarea{-webkit-user-select:text;user-select:text;}
 </style>
 </head>
 <body>
@@ -27,6 +30,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script>
+// 입력칸을 제외하고 글자 선택·길게 누르기 메뉴·드래그 시작을 막음
+['selectstart','contextmenu','dragstart'].forEach(ev=>document.addEventListener(ev,e=>{if(!e.target.closest||!e.target.closest('input,textarea'))e.preventDefault();}));
 (function(){
 // ⏱ 일시정지 가능한 타이머 (이 스크립트 안의 setTimeout/setInterval만 대상)
 const Clock=(()=>{
