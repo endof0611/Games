@@ -269,11 +269,15 @@ input,textarea{-webkit-user-select:text;user-select:text;}
 // 입력칸을 제외하고 글자 선택·길게 누르기 메뉴·드래그 시작을 막음
 ['selectstart','contextmenu','dragstart'].forEach(ev=>document.addEventListener(ev,e=>{if(!e.target.closest||!e.target.closest('input,textarea'))e.preventDefault();}));
 // AUDIO
+// 아이폰: 무음(진동) 모드에서도 게임 소리가 나도록 '재생' 오디오로 지정 (iOS 17+, 사파리·크롬 공통)
+try{if(navigator.audioSession)navigator.audioSession.type='playback';}catch(e){}
 class Au{
   constructor(){this.c=null;this.on=false;this.g=null;}
-  init(){if(this.c)return;this.c=new(window.AudioContext||window.webkitAudioContext)();this.g=this.c.createGain();this.g.gain.value=0.5;this.g.connect(this.c.destination);this.on=true;document.getElementById('audioToggle').textContent='🔊';}
+  // iOS는 전화·앱 전환 뒤 'interrupted' 상태가 되므로 running이 아니면 모두 재개
+  wake(){if(this.c&&this.c.state!=='running')this.c.resume();}
+  init(){if(this.c){this.wake();return;}this.c=new(window.AudioContext||window.webkitAudioContext)();this.g=this.c.createGain();this.g.gain.value=0.5;this.g.connect(this.c.destination);this.on=true;document.getElementById('audioToggle').textContent='🔊';}
   toggle(){if(!this.c){this.init();return;}this.on=!this.on;this.g.gain.value=this.on?0.5:0;document.getElementById('audioToggle').textContent=this.on?'🔊':'🔇';}
-  t(f,d,ty='sine',v=0.3){if(!this.c||!this.on)return;const o=this.c.createOscillator(),g=this.c.createGain();o.type=ty;o.frequency.value=f;g.gain.setValueAtTime(v,this.c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,this.c.currentTime+d);o.connect(g);g.connect(this.g);o.start();o.stop(this.c.currentTime+d);}
+  t(f,d,ty='sine',v=0.3){if(!this.c||!this.on)return;this.wake();const o=this.c.createOscillator(),g=this.c.createGain();o.type=ty;o.frequency.value=f;g.gain.setValueAtTime(v,this.c.currentTime);g.gain.exponentialRampToValueAtTime(0.001,this.c.currentTime+d);o.connect(g);g.connect(this.g);o.start();o.stop(this.c.currentTime+d);}
   lock(){this.t(800,0.1,'square',0.15);setTimeout(()=>this.t(1200,0.15,'square',0.12),80);}
   lightOff(){this.t(200,0.15,'sine',0.1);}lightOn(){this.t(600,0.1,'sine',0.1);}
   move(){this.t(250,0.06,'triangle',0.1);setTimeout(()=>this.t(300,0.06,'triangle',0.08),80);}
@@ -293,6 +297,14 @@ class Au{
   stopAmb(){if(this._a){this._a.stop();this._a=null;}}
 }
 const au=new Au();
+// 모바일 오디오 잠금 해제: iOS(사파리·크롬 모두 WebKit)는 touchstart가 아닌 touchend/클릭에서만 허용
+function auUnlock(){
+  if(!au.c)return;   // 오디오는 시작 버튼에서 만들어짐 (그 전엔 켜지지 않은 상태 유지)
+  au.wake();
+  try{const s=au.c.createBufferSource();s.buffer=au.c.createBuffer(1,1,22050);s.connect(au.c.destination);s.start(0);}catch(e){}
+}
+['touchend','pointerup','keydown'].forEach(ev=>window.addEventListener(ev,auUnlock,true));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)au.wake();});
 
 // HOUSE DATA
 const HOUSE1={rooms:{

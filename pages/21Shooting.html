@@ -502,9 +502,12 @@ function mkEl(tag,text,props){ const el=document.createElement(tag); if(text!==u
 //  SOUND ENGINE (Web Audio API)
 // ─────────────────────────────
 let audioCtx=null;
+// 아이폰: 무음(진동) 모드에서도 게임 소리가 나도록 '재생' 오디오로 지정 (iOS 17+, 사파리·크롬 공통)
+try{ if(navigator.audioSession) navigator.audioSession.type='playback'; }catch(e){}
 function getACtx(){
   if(!audioCtx) audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-  if(audioCtx.state==='suspended') audioCtx.resume();
+  // iOS는 전화·앱 전환 뒤 'interrupted' 상태가 되므로 running이 아니면 모두 재개
+  if(audioCtx.state!=='running') audioCtx.resume();
   return audioCtx;
 }
 
@@ -1275,10 +1278,15 @@ window.addEventListener('orientationchange',()=>{
 document.getElementById('gameCanvas').addEventListener('contextmenu',e=>e.preventDefault());
 document.addEventListener('touchmove',e=>{ if(e.target===gameCanvas) e.preventDefault(); },{passive:false});
 
-// AudioContext 모바일 unlock (첫 터치/클릭 시 자동 활성화)
-['touchstart','mousedown'].forEach(ev=>{
-  document.addEventListener(ev, ()=>getACtx(), {once:true, passive:true});
-});
+// 모바일 오디오 잠금 해제: iOS(사파리·크롬 모두 WebKit)는 touchstart가 아닌 touchend/클릭에서만 허용
+// FIRE 버튼은 touchstart에서 쏘므로, 첫 손 뗌에서 무음 버퍼로 미리 잠금을 풀어 둠
+function unlockAudio(){
+  const c=getACtx();
+  try{ const s=c.createBufferSource(); s.buffer=c.createBuffer(1,1,22050); s.connect(c.destination); s.start(0); }catch(e){}
+  if(c.state==='running') ['touchend','pointerup','keydown'].forEach(ev=>window.removeEventListener(ev,unlockAudio,true));
+}
+['touchend','pointerup','keydown'].forEach(ev=>window.addEventListener(ev,unlockAudio,true));
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden && audioCtx && audioCtx.state!=='running') audioCtx.resume(); });
 
 showScreen('title');
 </script>
