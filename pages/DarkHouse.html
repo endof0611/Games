@@ -197,6 +197,9 @@ body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-
 .jumpscare-img img{width:100vw;height:100vh;object-fit:cover;animation:jsImg 0.08s steps(2) infinite;}
 @keyframes jsImg{0%{transform:translate(0,0) scale(1);}25%{transform:translate(-3px,2px) scale(1.02);}50%{transform:translate(4px,-3px) scale(0.99);}75%{transform:translate(-2px,-2px) scale(1.01);}100%{transform:translate(3px,3px) scale(1);}}
 .shake{animation:sk 0.08s infinite;}@keyframes sk{0%,100%{transform:translate(0,0);}25%{transform:translate(-4px,2px);}50%{transform:translate(3px,-3px);}75%{transform:translate(-2px,4px);}}
+/* 연타·길게 누르기 때 글자 선택, 돋보기, 복사 메뉴, 드래그가 생겨 조작을 방해하지 않도록 (iOS 사파리는 -webkit- 접두어 필요) */
+*{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none;}
+input,textarea{-webkit-user-select:text;user-select:text;}
 </style>
 </head>
 <body>
@@ -263,6 +266,8 @@ body{background:var(--darker);color:var(--text);font-family:'Noto Sans KR',sans-
 <div class="screen" id="result-screen"><div class="result-header"><h2 id="resultTitle"></h2><div class="result-sub" id="resultSub"></div></div><div class="result-stats" id="resultStats"></div><div class="result-map-container" id="resultMapContainer"><div class="result-map-title">─── 집 전체 현황 ───</div><div class="result-map" id="resultMap"></div></div><button class="gbtn secondary" id="retryBtn">다시 도전</button><button class="gbtn" id="nextStageBtn" style="display:none">다음 스테이지 →</button><div style="height:40px"></div></div>
 
 <script>
+// 입력칸을 제외하고 글자 선택·길게 누르기 메뉴·드래그 시작을 막음
+['selectstart','contextmenu','dragstart'].forEach(ev=>document.addEventListener(ev,e=>{if(!e.target.closest||!e.target.closest('input,textarea'))e.preventDefault();}));
 // AUDIO
 class Au{
   constructor(){this.c=null;this.on=false;this.g=null;}
